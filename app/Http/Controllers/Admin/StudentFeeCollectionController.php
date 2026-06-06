@@ -15,15 +15,45 @@ use Illuminate\Http\Request;
 class StudentFeeCollectionController extends Controller
 {
 
-    public function index()
-    {
-        $years = AcademicYear::where('status', 'active')
-            ->orderBy('id', 'desc')
-            ->get();
-        $cashiers = Cashier::latest()->get();
-        
-        return view('admin.fee-collection.index', compact('years', 'cashiers'));
-    }
+public function index()
+{
+    $madrasaId = auth()->user()->madrasa_id ?? 1;
+
+    $years    = AcademicYear::where('status', 'active')->orderBy('id', 'desc')->get();
+    $cashiers = Cashier::latest()->get();
+
+    $todayTotal = \App\Models\FeeCollection::where('madrasa_id', $madrasaId)
+        ->whereDate('collection_date', today())
+        ->sum('paid_amount');
+
+    $myTotal = \App\Models\FeeCollection::where('madrasa_id', $madrasaId)
+        ->whereDate('collection_date', today())
+        ->where('collected_by', auth()->id())
+        ->sum('paid_amount');
+
+    $payments = \App\Models\FeeCollection::with(['student.user', 'collector'])
+        ->where('madrasa_id', $madrasaId)
+        ->whereDate('collection_date', today())
+        ->latest()
+        ->get()
+        ->map(fn($p) => (object)[
+            'id'           => $p->id,
+            'payment_date' => $p->collection_date,
+            'created_at'   => $p->created_at,
+            'student_id'   => optional($p->student?->user)->institution_user_id ?? '—',
+            'student_name' => optional($p->student?->user)->name_bn ?? '—',
+            'month'        => $p->month ?? '—',
+            'amount'       => $p->paid_amount,
+            'discount'     => $p->discount,
+            'method'       => $p->payment_method_id ? 'Mobile' : 'Cash',
+            'cashier_name' => optional($p->collector)->name ?? '—',
+            'voucher_no'   => $p->receipt_no,
+        ]);
+
+    return view('admin.fee-collection.index', compact(
+        'years', 'cashiers', 'todayTotal', 'myTotal', 'payments'
+    ));
+}
 
 private function getStudentFeeAmount($student)
 {
@@ -107,77 +137,82 @@ private function getStudentFeeAmount($student)
     // =========================
     // STUDENT INFO
     // =========================
-    public function studentInfo(Request $req)
-    {
-        $student = Student::with([
-                'user',
-                'admissions.class'
-            ])
-            ->whereHas('user', function ($q) use ($req) {
-                $q->where('institution_user_id', $req->id);
-            })
-            ->first();
+public function studentInfo(Request $req)
+{
+    $student = Student::with([
+            'user',
+            'admissions.class'
+        ])
+        ->whereHas('user', function ($q) use ($req) {
+            $q->where('institution_user_id', $req->id);
+        })
+        ->first();
 
-        if (!$student) {
-            return response()->json([
-                'success' => false,
-                'message' => 'শিক্ষার্থী পাওয়া যায়নি'
-            ]);
-        }
-
-        $user = $student->user;
-
-        $lastVoucher = StudentPayment::max('voucher_no');
-
-        $nextVoucher = $lastVoucher ? $lastVoucher + 1 : 4001;
-        $payments = StudentPayment::where('student_id', $student->id)->get();
-
-$amount = $this->getStudentFeeAmount($student);
-
-$months = [
-    'Jan','Feb','Mar','Apr','May','Jun',
-    'Jul','Aug','Sep','Oct','Nov','Dec'
-];
-
-$monthList = collect($months)->map(function ($m) use ($payments, $amount) {
-
-    return [
-        'name' => $m,
-        'fee' => (float) $amount,
-        'is_paid' => $payments->where('month', $m)->count() > 0
-    ];
-});
-
-$total = $amount * 12;
-$paid = $payments->sum('amount');
-$discount = $payments->sum('discount');
-$due = $total - ($paid + $discount);
-
-
-        $admission = $student->admissions()->latest()->first();
-
+    if (!$student) {
         return response()->json([
-            'success' => true,
-            'voucher_no' => $nextVoucher,
-            'academic_year_id' => $admission?->academic_year_id,
-            'student' => [
-                'id' => $user->institution_user_id,
-                'name' => $user->name_bn,
-                'father_name' => $user->father_name,
-                'mobile' => $user->phone,
-                'class_name' => optional($admission?->class)->name_bn ?? '',
-                'photo' => $user->photo,
-                'remarks' => $user->guardian_name ?? '',
-            ],
-            'fee' => [
-                'total' => $total,
-                'paid' => $paid,
-                'discount' => $discount,
-                'due' => $due,
-            ],
-            'monthList' => $monthList
+            'success' => false,
+            'message' => 'শিক্ষার্থী পাওয়া যায়নি'
         ]);
     }
+
+    $user = $student->user;
+    $admission = $student->admissions()->latest()->first();
+
+    // ✅ আগে $amount define করো
+    $amount = $this->getStudentFeeAmount($student);
+
+    // ✅ তারপর voucher
+    $lastVoucher = \App\Models\FeeCollection::max('receipt_no');
+    $nextVoucher = $lastVoucher ? $lastVoucher + 1 : 4001;
+
+    // ✅ তারপর payments ও monthList
+    $payments = \App\Models\FeeCollection::where('student_id', $student->id)->get();
+
+    $months = [
+        'Jan','Feb','Mar','Apr','May','Jun',
+        'Jul','Aug','Sep','Oct','Nov','Dec'
+    ];
+
+    $monthList = collect($months)->map(function ($m) use ($payments, $amount) {
+        return [
+            'name'      => $m,
+            'fee'       => (float) $amount,
+            'is_paid'   => $payments
+                            ->where('month', $m)
+                            ->where('pay_type', 'monthly')
+                            ->where('due_amount', 0)
+                            ->count() > 0,
+            'prev_paid' => $payments->where('month', $m)->sum('paid_amount'),
+        ];
+    });
+
+    $total    = $amount * 12;
+    $paid     = $payments->sum('paid_amount');
+    $discount = $payments->sum('discount');
+    $due      = $total - ($paid + $discount);
+
+    return response()->json([
+        'success'          => true,
+        'voucher_no'       => $nextVoucher,
+        'academic_year_id' => $admission?->academic_year_id,
+        'student' => [
+            'id'          => $user->institution_user_id,
+            'name'        => $user->name_bn,
+            'father_name' => $user->father_name,
+            'mobile'      => $user->phone,
+            'class_name'  => optional($admission?->class)->name_bn ?? '',
+            'photo'       => $user->photo,
+            'remarks'     => $user->guardian_name ?? '',
+        ],
+        'fee' => [
+            'total'    => $total,
+            'paid'     => $paid,
+            'discount' => $discount,
+            'due'      => $due,
+        ],
+        'monthList' => $monthList
+    ]);
+}
 
 
 
@@ -185,13 +220,9 @@ $due = $total - ($paid + $discount);
     // SAVE PAYMENT
     // =========================
 
-    public function savePayment(Request $req)
+ public function savePayment(Request $req)
 {
-
-
-dd($req->all());
     try {
-
         $student = Student::with('user')
             ->whereHas('user', function ($q) use ($req) {
                 $q->where('institution_user_id', $req->student_id);
@@ -199,187 +230,198 @@ dd($req->all());
             ->first();
 
         if (!$student) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Student not found'
-            ]);
+            return response()->json(['success' => false, 'message' => 'Student not found']);
         }
 
-        $lastVoucher = StudentPayment::max('voucher_no');
-
-        if ($lastVoucher) {
-            $voucher = $lastVoucher + 1;
-        } else {
-            $voucher = 4001;
-        }
+        // ✅ FeeCollection table এর last receipt_no থেকে next নাও
+        $lastReceipt = \App\Models\FeeCollection::max('receipt_no');
+        $receiptNo   = $lastReceipt ? $lastReceipt + 1 : 4001;
 
         $cashierId = null;
-
         if (!empty($req->cashier_id)) {
-
             $cashier = Cashier::find($req->cashier_id);
-
-            if ($cashier) {
-                $cashierId = $cashier->id;
-            }
+            if ($cashier) $cashierId = $cashier->id;
         }
 
-        $amount = $this->getStudentFeeAmount($student);
+        // payment method info
+        $pmId = $req->payment_method_id ?? null;
 
-$months = $req->months ?? [];
+        if ($req->pay_type === 'monthly') {
 
-if ($req->pay_type === 'monthly') {
+            $months     = $req->months ?? [];
+            $paidMonths = [];
 
-    foreach ($months as $m) {
+            foreach ($months as $m) {
 
-        StudentPayment::create([
-            'madrasa_id'         => auth()->user()->madrasa_id ?? 1,
-            'student_id'         => $student->id,
-            'user_id'            => $student->user_id,
-            'month'              => $m,
-            'pay_type'           => 'monthly',
-            'amount'             => $amount,
-            'discount'           => $req->discount ?? 0,
-            'method'             => $req->pay_method,
-            'pay_method_label'   => $req->pay_method_label,
-            'pay_account_number' => $req->pay_account_number,
-            'cashier_id'         => $cashierId,
-            'payment_date'       => $req->payment_date,
-            'voucher_no'         => $voucher,
-            'note'               => $req->note,
+                $deposit  = (float)($m['deposit']  ?? 0);
+                $discount = (float)($m['discount'] ?? 0);
+                $fee      = (float)($m['fee']      ?? $deposit);
+                $due      = max(0, $fee - $discount - $deposit);
+
+                \App\Models\FeeCollection::create([
+                    'madrasa_id'        => auth()->user()->madrasa_id ?? 1,
+                    'student_id'        => $student->id,
+                    'receipt_no'        => $receiptNo,
+                    'collection_date'   => $req->collection_date,
+                    'total_amount'      => $fee,
+                    'discount'          => $discount,
+                    'paid_amount'       => $deposit,
+                    'due_amount'        => $due,
+                    'payment_method_id' => $pmId,
+                    'month'             => $m['name'],
+                    'pay_type'          => 'monthly',
+                    'status'            => $due > 0 ? 'partial' : 'paid',
+                    'note'              => $req->note,
+                    'collected_by'      => $cashierId ?? auth()->id(),
+                ]);
+
+                $paidMonths[] = $m['name'];
+                $receiptNo++;   // প্রতি মাসের জন্য আলাদা receipt চাইলে, না চাইলে বাইরে রাখো
+            }
+
+        } else {
+
+            // admission
+            $admItems      = $req->admission_items ?? [];
+            $totalDeposit  = collect($admItems)->sum('deposit');
+            $totalDiscount = collect($admItems)->sum('discount');
+            $totalFee      = collect($admItems)->sum('fee');
+            $due           = max(0, $totalFee - $totalDiscount - $totalDeposit);
+
+            \App\Models\FeeCollection::create([
+                'madrasa_id'        => auth()->user()->madrasa_id ?? 1,
+                'student_id'        => $student->id,
+                'receipt_no'        => $receiptNo,
+                'collection_date'   => $req->collection_date,
+                'total_amount'      => $totalFee,
+                'discount'          => $totalDiscount,
+                'paid_amount'       => $totalDeposit,
+                'due_amount'        => $due,
+                'payment_method_id' => $pmId,
+                'month'             => null,
+                'pay_type'          => 'admission',
+                'status'            => $due > 0 ? 'partial' : 'paid',
+                'note'              => $req->note,
+                'collected_by'      => $cashierId ?? auth()->id(),
+            ]);
+
+            $paidMonths = [];
+        }
+
+        // updated fee summary
+        $allPayments   = \App\Models\FeeCollection::where('student_id', $student->id)->get();
+        $feeAmount     = $this->getStudentFeeAmount($student);
+        $totalPaid     = $allPayments->sum('paid_amount');
+        $totalDiscount = $allPayments->sum('discount');
+
+        return response()->json([
+            'success'    => true,
+            'voucher_no' => $lastReceipt ? \App\Models\FeeCollection::max('receipt_no') : $receiptNo,
+            'paidMonths' => $paidMonths,
+            'fee' => [
+                'total'    => $feeAmount * 12,
+                'paid'     => $totalPaid,
+                'discount' => $totalDiscount,
+                'due'      => max(0, ($feeAmount * 12) - $totalPaid - $totalDiscount),
+            ]
         ]);
-    }
-
-} else {
-
-    StudentPayment::create([
-        'madrasa_id'         => auth()->user()->madrasa_id ?? 1,
-        'student_id'         => $student->id,
-        'user_id'            => $student->user_id,
-        'pay_type'           => 'admission',
-        'amount'             => $amount,
-        'discount'           => $req->discount ?? 0,
-        'method'             => $req->pay_method,
-        'pay_method_label'   => $req->pay_method_label,
-        'pay_account_number' => $req->pay_account_number,
-        'cashier_id'         => $cashierId,
-        'payment_date'       => $req->payment_date,
-        'voucher_no'         => $voucher,
-        'note'               => $req->note,
-    ]);
-}
-
-return response()->json([
-    'success' => true,
-    'voucher_no' => $voucher,
-    'paidMonths' => $months,
-    'fee' => [
-        'total' => $amount * 12,
-        'paid' => StudentPayment::where('student_id', $student->id)->sum('amount'),
-        'discount' => StudentPayment::where('student_id', $student->id)->sum('discount'),
-        'due' => ($amount * 12)
-            - StudentPayment::where('student_id', $student->id)->sum('amount')
-            - StudentPayment::where('student_id', $student->id)->sum('discount'),
-    ]
-]);
 
     } catch (\Exception $e) {
-
         return response()->json([
             'success' => false,
             'message' => $e->getMessage(),
-            'line' => $e->getLine(),
-            'file' => $e->getFile(),
+            'line'    => $e->getLine(),
+            'file'    => $e->getFile(),
         ], 500);
     }
 }
     // =========================
     // TODAY PAYMENTS
     // =========================
-    public function todayPayments(Request $req)
-    {
-        $query = StudentPayment::with(['user','cashier']);
 
-        if ($req->search) {
+public function todayPayments(Request $req)
+{
+    $madrasaId = auth()->user()->madrasa_id ?? 1;
 
-            $query->where(function($q) use ($req){
+    $query = \App\Models\FeeCollection::with(['student.user', 'collector'])
+        ->where('madrasa_id', $madrasaId);
 
-                $q->where('voucher_no', 'like', '%' . $req->search . '%')
-                  ->orWhere('student_id', 'like', '%' . $req->search . '%');
-
-            });
-        }
-
-        $payments = $query->latest()
-            ->take(50)
-            ->get();
-
-        return response()->json([
-            'success' => true,
-            'todayTotal' => 0,
-            'myTotal' => 0,
-
-            'payments' => $payments->map(function ($p) {
-
-                return [
-                    'id' => $p->id,
-                    'student_id' => optional($p->user)->institution_user_id,
-                    'student_name' => $p->user->name_bn ?? '',
-                    'month' => $p->month,
-                    'amount' => 0,
-                    'discount' => 0,
-                    'method' => $p->method,
-                    'cashier_name' => optional($p->cashier)->name ?? '',
-                    'voucher_no' => $p->voucher_no,
-                    'payment_date' => $p->payment_date,
-                    'created_at' => $p->created_at,
-                ];
-            })
-        ]);
+    if ($req->search) {
+        $query->where(function ($q) use ($req) {
+            $q->where('receipt_no', 'like', '%' . $req->search . '%')
+              ->orWhereHas('student.user', function ($q2) use ($req) {
+                  $q2->where('institution_user_id', 'like', '%' . $req->search . '%');
+              });
+        });
     }
 
-    // =========================
-    // STATEMENT
-    // =========================
-    public function statement(Request $req)
-    {
-        $student = Student::with('user')
-            ->whereHas('user', function ($q) use ($req) {
-                $q->where('institution_user_id', $req->student_id);
-            })
-            ->first();
+    $payments = $query->latest()->take(50)->get();
 
-        if (!$student) {
+    $todayTotal = \App\Models\FeeCollection::where('madrasa_id', $madrasaId)
+        ->whereDate('collection_date', today())
+        ->sum('paid_amount');
 
-            return response()->json([
-                'success' => false,
-                'message' => 'Student not found'
-            ]);
-        }
+    $myTotal = \App\Models\FeeCollection::where('madrasa_id', $madrasaId)
+        ->whereDate('collection_date', today())
+        ->where('collected_by', auth()->id())
+        ->sum('paid_amount');
 
-        $payments = StudentPayment::with(['cashier','user'])
-            ->where('student_id', $student->id)
-            ->get();
+    return response()->json([
+        'success'    => true,
+        'todayTotal' => $todayTotal,
+        'myTotal'    => $myTotal,
+        'payments'   => $payments->map(function ($p) {
+            return [
+                'id'           => $p->id,
+                'student_id'   => optional($p->student?->user)->institution_user_id ?? '—',
+                'student_name' => optional($p->student?->user)->name_bn ?? '—',
+                'month'        => $p->month ?? '—',
+                'amount'       => $p->paid_amount,
+                'discount'     => $p->discount,
+                'method'       => $p->payment_method_id ? 'Mobile' : 'Cash',
+                'cashier_name' => optional($p->collector)->name ?? '—',
+                'voucher_no'   => $p->receipt_no,
+                'payment_date' => $p->collection_date,
+                'created_at'   => $p->created_at,
+            ];
+        })
+    ]);
+}
 
-        return response()->json([
-            'success' => true,
-            'student_name' => optional($payments->first()?->user)->name_bn,
-            'student_id'   => $req->student_id,
+public function statement(Request $req)
+{
+    $student = Student::with('user')
+        ->whereHas('user', function ($q) use ($req) {
+            $q->where('institution_user_id', $req->student_id);
+        })
+        ->first();
 
-            'payments' => $payments->map(function ($p) {
-
-                return [
-                    'date' => date('d/m/Y', strtotime($p->payment_date)),
-                    'time' => date('h:i A', strtotime($p->created_at)),
-                    'month' => $p->month,
-                    'amount' => 0,
-                    'method' => $p->method,
-                    'cashier' => optional($p->cashier)->name ?? '',
-                    'voucher_no' => $p->voucher_no,
-                ];
-            })
-        ]);
+    if (!$student) {
+        return response()->json(['success' => false, 'message' => 'Student not found']);
     }
+
+    $payments = \App\Models\FeeCollection::with(['collector'])
+        ->where('student_id', $student->id)
+        ->latest()
+        ->get();
+
+    return response()->json([
+        'success'      => true,
+        'student_name' => $student->user->name_bn ?? '',
+        'student_id'   => $req->student_id,
+        'payments'     => $payments->map(function ($p) {
+            return [
+                'date'       => \Carbon\Carbon::parse($p->collection_date)->format('d/m/Y'),
+                'time'       => \Carbon\Carbon::parse($p->created_at)->format('h:i A'),
+                'month'      => $p->month ?? '—',
+                'amount'     => $p->paid_amount,
+                'method'     => $p->payment_method_id ? 'Mobile/Bank' : 'Cash',
+                'cashier'    => optional($p->collector)->name ?? '—',
+                'voucher_no' => $p->receipt_no,
+            ];
+        })
+    ]);
+}
 
 public function addCashier(Request $request)
 {

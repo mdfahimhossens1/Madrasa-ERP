@@ -19,4 +19,3 @@ setTimeout(() => {
 $(document).ready( function () {
     $('#myTable').DataTable();
 } );
-

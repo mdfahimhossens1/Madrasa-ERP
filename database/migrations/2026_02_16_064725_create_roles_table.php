@@ -6,28 +6,19 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    /**
-     * Run the migrations.
-     */
-    public function up(): void{
-
-    Schema::create('roles', function (Blueprint $table) {
+    public function up(): void
+    {
+        Schema::create('roles', function (Blueprint $table) {
             $table->id();
-            $table->string('role_name')->unique(); // admin, manager, user
+            $table->string('role_name', 100);
+            $table->string('slug', 100)->unique();
+            $table->integer('level')->default(0);
+            $table->boolean('is_system')->default(0);
+            $table->text('description')->nullable();
             $table->timestamps();
         });
-
-        DB::table('roles')->insert([
-            ['role_name' => 'Super Admin', 'created_at' => now(), 'updated_at' => now()],
-            ['role_name' => 'Admin', 'created_at' => now(), 'updated_at' => now()],
-            ['role_name' => 'Manager', 'created_at' => now(), 'updated_at' => now()],
-            ['role_name' => 'User', 'created_at' => now(), 'updated_at' => now()],
-        ]);
     }
 
-    /**
-     * Reverse the migrations.
-     */
     public function down(): void
     {
         Schema::dropIfExists('roles');

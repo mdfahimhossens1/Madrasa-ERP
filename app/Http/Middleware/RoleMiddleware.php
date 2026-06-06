@@ -9,40 +9,72 @@ use Illuminate\Support\Facades\Auth;
 
 class RoleMiddleware
 {
-        private function normalize(?string $role): string
+    /**
+     * Normalize role slug
+     * Example:
+     * super-admin => super_admin
+     */
+    private function normalize(?string $role): string
     {
         $role = strtolower(trim($role ?? 'user'));
-        // "Super Admin" => "super_admin"
-        $role = str_replace([' ', '-'], '_', $role);
-        return $role;
+
+        return str_replace([' ', '-'], '_', $role);
     }
 
-    public function handle(Request $request, Closure $next, ...$roles)
+    public function handle(Request $request, Closure $next, ...$roles): Response
     {
-        
         $user = Auth::user();
-        if (!$user) abort(403);
 
-        $dbRole = optional($user->role)->role_name ?? 'User';
+        // User logged in?
+        if (!$user) {
+            return redirect()->route('login');
+        }
+
+        // Get user role slug
+        $dbRole = optional($user->role)->slug ?? 'user';
+
         $roleName = $this->normalize($dbRole);
 
-        // hierarchy
+        /*
+        |--------------------------------------------------------------------------
+        | Role Hierarchy
+        |--------------------------------------------------------------------------
+        | Higher number = higher power
+        */
+
         $levels = [
-            'user' => 1,
-            'manager' => 2,
-            'admin' => 3,
-            'super_admin' => 4,
+
+            'guardian'       => 1,
+            'student'        => 2,
+            'teacher'        => 3,
+
+            'madrasa_admin' => 4,
+
+            'soft_admin'    => 5,
+
+            'super_admin'   => 6,
         ];
 
         $userLevel = $levels[$roleName] ?? 0;
 
-        foreach ($roles as $r) {
-            $need = $levels[$this->normalize($r)] ?? 0;
-            if ($userLevel >= $need) {
+        /*
+        |--------------------------------------------------------------------------
+        | Check Required Roles
+        |--------------------------------------------------------------------------
+        */
+
+        foreach ($roles as $role) {
+
+            $requiredRole = $this->normalize($role);
+
+            $requiredLevel = $levels[$requiredRole] ?? 0;
+
+            // User has required role or higher
+            if ($userLevel >= $requiredLevel) {
                 return $next($request);
             }
         }
 
-        abort(403, 'You are not authorized to access this page.');
+        abort(403, 'Unauthorized Access.');
     }
 }

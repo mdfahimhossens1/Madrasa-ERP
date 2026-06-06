@@ -7,11 +7,5 @@ use Illuminate\Http\Request;
 
 class ReportController extends Controller
 {
-        public function sales(){
-        return view('admin.reports.sales');
-    }
-
-    public function products(){
-        return view('admin.reports.products');
-    }
+    //
 }

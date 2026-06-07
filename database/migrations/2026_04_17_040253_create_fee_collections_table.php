@@ -13,6 +13,8 @@ return new class extends Migration
             $table->id();
             $table->foreignId('madrasa_id')->constrained('madrasas')->onDelete('cascade');
             $table->foreignId('student_id')->constrained('students')->onDelete('cascade');
+            $table->unsignedBigInteger('fee_setting_id')->nullable();
+            $table->unsignedBigInteger('sub_ledger_id')->nullable();
             $table->string('receipt_no')->unique();
             $table->date('collection_date');
             $table->decimal('total_amount', 10, 2)->default(0.00);

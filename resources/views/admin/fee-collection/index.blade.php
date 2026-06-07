@@ -1228,9 +1228,21 @@ function renderMonthChips() {
         chip.type = 'button';
         const isSelected = selectedMonths.some(s => s.name === m.name);
         let cls = 'month-chip ';
-        if (m.is_paid)       cls += 'paid';
-        else if (isSelected) cls += 'selected';
-        else                 cls += 'due';
+        const partialPaid =
+    Number(m.prev_paid) > 0 &&
+    !m.is_paid;
+
+if (m.is_paid)
+    cls += 'paid';
+
+else if (partialPaid)
+    cls += 'partial';
+
+else if (isSelected)
+    cls += 'selected';
+
+else
+    cls += 'due';
 
         chip.className = cls;
         chip.title     = m.is_paid ? 'পরিশোধ হয়েছে' : '';
@@ -1315,6 +1327,7 @@ function removeMonth(idx) {
 
 function clearAllMonths() {
     selectedMonths = [];
+    searchStudent();
     renderMonthChips();
     updateFeeSummary();
     updateKothaBox();
@@ -1418,12 +1431,15 @@ function openAdmissionPopup() {
     document.getElementById('admPopupStudentName').textContent = name;
     document.getElementById('admPopupStudentSub').textContent  = `ID: ${sid} | ক্লাস: ${cls}`;
 
-    if (!admissionFeeItems.length) {
-        const total = Number(document.getElementById('feeTotal').textContent) || 0;
-        admissionFeeItems = [
-            { name: 'ভর্তি ফি', fee: total, discount: 0, deposit: total }
-        ];
-    }
+if (!admissionFeeItems.length) {
+
+    showToast(
+        'ভর্তি ফি সেটিং পাওয়া যায়নি',
+        'error'
+    );
+
+    return;
+}
 
     const totalFee = admissionFeeItems.reduce((s, i) => s + i.fee, 0);
     document.getElementById('admTotalFee').value  = totalFee;
@@ -1479,7 +1495,9 @@ function saveAdmissionFee() {
     let html = '';
     admissionFeeItems.forEach(item => {
         html += `<div class="adm-sum-row">
-            <span>${item.name}</span>
+            <span>
+                ৳ ${item.fee}
+            </span>
             <span class="adm-sum-total">৳ ${Number(item.deposit).toLocaleString()}</span>
         </div>`;
     });
@@ -1625,10 +1643,17 @@ function savePayment() {
     btn.disabled = true;
     btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> সংরক্ষণ হচ্ছে...';
 
-let paymentMethodId = selectedAccountId;
+let paymentMethodId = selectedAccountId || null;
 
-if (!paymentMethodId) {
-    showToast('পেমেন্ট মেথড সিলেক্ট করুন', 'error');
+if (
+    currentMethodType !== 'cash'
+    &&
+    !paymentMethodId
+) {
+    showToast(
+        'পেমেন্ট মেথড সিলেক্ট করুন',
+        'error'
+    );
     return;
 }
 if (
@@ -1664,12 +1689,33 @@ if (
             showToast(`পেমেন্ট সংরক্ষিত! ভাউচার: ${data.voucher_no}`, 'success');
 
             const f = data.fee;
-            document.getElementById('feeTotal').textContent    = f.total;
-            document.getElementById('feeDiscount').textContent = f.discount;
-            document.getElementById('feePaid').textContent     = f.paid;
-            document.getElementById('feeDue').textContent      = f.due;
-            document.getElementById('feeReceipt').textContent  = data.voucher_no;
+            document.getElementById('feeTotal').textContent = f.total;
+            document.getElementById('feeTotal').dataset.base = f.total;
 
+            document.getElementById('feeDiscount').textContent = f.discount;
+            document.getElementById('feeDiscount').dataset.base = f.discount;
+
+            document.getElementById('feePaid').textContent = f.paid;
+            document.getElementById('feePaid').dataset.base = f.paid;
+
+            document.getElementById('feeDue').textContent = f.due;
+            document.getElementById('feeDue').dataset.base = f.due;
+            const feeTotal = document.getElementById('feeTotal');
+const feePaid = document.getElementById('feePaid');
+const feeDiscount = document.getElementById('feeDiscount');
+const feeDue = document.getElementById('feeDue');
+
+feeTotal.textContent = Number(f.total).toLocaleString();
+feeTotal.dataset.base = f.total;
+
+feePaid.textContent = Number(f.paid).toLocaleString();
+feePaid.dataset.base = f.paid;
+
+feeDiscount.textContent = Number(f.discount).toLocaleString();
+feeDiscount.dataset.base = f.discount;
+
+feeDue.textContent = Number(f.due).toLocaleString();
+feeDue.dataset.base = f.due;
             if (data.paidMonths) {
                 currentMonthList.forEach(m => {
                     if (data.paidMonths.includes(m.name)) m.is_paid = true;

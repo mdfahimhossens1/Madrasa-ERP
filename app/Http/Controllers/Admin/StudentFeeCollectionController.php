@@ -55,83 +55,117 @@ public function index()
     ));
 }
 
-private function getStudentFeeAmount($student)
+private function getStudentFeeAmount($student, $payType = 'monthly')
 {
     $admission = $student->admissions()->latest()->first();
 
     if (!$admission) {
-        return 0;
+        return [
+            'total' => 0,
+            'items' => []
+        ];
     }
 
-    $feeSetting = FeeSetting::where('academic_year_id', $admission->academic_year_id)
-        ->where(function ($q) use ($admission) {
-            $q->where('class_id', $admission->class_id)
-              ->orWhereNull('class_id');
-        })
-        ->first();
+    $feeSettings = FeeSetting::with('subLedger')
+        ->where('academic_year_id', $admission->academic_year_id)
+        ->where('class_id', $admission->class_id)
+        ->get();
 
-    if (!$feeSetting) {
-        return 0;
+    if ($feeSettings->isEmpty()) {
+        return [
+            'total' => 0,
+            'items' => []
+        ];
     }
 
     $gender   = $student->user->gender;
     $resident = $admission->residence_status;
     $type     = $admission->admission_type;
 
-    if ($gender === 'male') {
+    $total = 0;
+    $items = [];
 
-        if ($resident === 'resident') {
-            return $type === 'new'
-                ? $feeSetting->chattra_abashik_new
-                : $feeSetting->chattra_abashik_old;
+    foreach ($feeSettings as $fee) {
+
+        $feeType = $fee->subLedger?->fee_type;
+
+        if ($payType == 'monthly' && $feeType != 'monthly') {
+            continue;
         }
 
-        if ($resident === 'non_resident') {
-            return $type === 'new'
-                ? $feeSetting->chattra_onabashik_new
-                : $feeSetting->chattra_onabashik_old;
+        if ($payType == 'admission' && $feeType == 'monthly') {
+            continue;
         }
 
-        if ($resident === 'day_care') {
-            return $type === 'new'
-                ? $feeSetting->chattra_dekeyr_new
-                : $feeSetting->chattra_dekeyr_old;
+        $amount = 0;
+
+        if ($gender == 'male') {
+
+            if ($resident == 'resident') {
+                $amount = $type == 'new'
+                    ? $fee->chattra_abashik_new
+                    : $fee->chattra_abashik_old;
+            }
+
+            elseif ($resident == 'non_resident') {
+                $amount = $type == 'new'
+                    ? $fee->chattra_onabashik_new
+                    : $fee->chattra_onabashik_old;
+            }
+
+            elseif ($resident == 'day_care') {
+                $amount = $type == 'new'
+                    ? $fee->chattra_dekeyr_new
+                    : $fee->chattra_dekeyr_old;
+            }
+
+            elseif ($resident == 'night_care') {
+                $amount = $type == 'new'
+                    ? $fee->chattra_nightcare_new
+                    : $fee->chattra_nightcare_old;
+            }
+
+        } else {
+
+            if ($resident == 'resident') {
+                $amount = $type == 'new'
+                    ? $fee->chhatri_abashik_new
+                    : $fee->chhatri_abashik_old;
+            }
+
+            elseif ($resident == 'non_resident') {
+                $amount = $type == 'new'
+                    ? $fee->chhatri_onabashik_new
+                    : $fee->chhatri_onabashik_old;
+            }
+
+            elseif ($resident == 'day_care') {
+                $amount = $type == 'new'
+                    ? $fee->chhatri_dekeyr_new
+                    : $fee->chhatri_dekeyr_old;
+            }
+
+            elseif ($resident == 'night_care') {
+                $amount = $type == 'new'
+                    ? $fee->chhatri_nightcare_new
+                    : $fee->chhatri_nightcare_old;
+            }
         }
 
-        if ($resident === 'night_care') {
-            return $type === 'new'
-                ? $feeSetting->chattra_nightcare_new
-                : $feeSetting->chattra_nightcare_old;
-        }
+        $items[] = [
+            'fee_setting_id' => $fee->id,
+            'fee_name'       => $fee->subLedger?->name,
+            'fee_type'       => $feeType,
+            'amount'         => (float)$amount,
+        ];
 
-    } else {
-
-        if ($resident === 'resident') {
-            return $type === 'new'
-                ? $feeSetting->chhatri_abashik_new
-                : $feeSetting->chhatri_abashik_old;
-        }
-
-        if ($resident === 'non_resident') {
-            return $type === 'new'
-                ? $feeSetting->chhatri_onabashik_new
-                : $feeSetting->chhatri_onabashik_old;
-        }
-
-        if ($resident === 'day_care') {
-            return $type === 'new'
-                ? $feeSetting->chhatri_dekeyr_new
-                : $feeSetting->chhatri_dekeyr_old;
-        }
-
-        if ($resident === 'night_care') {
-            return $type === 'new'
-                ? $feeSetting->chhatri_nightcare_new
-                : $feeSetting->chhatri_nightcare_old;
-        }
+        $total += $amount;
     }
 
-    return 0;
+    return [
+        'total' => $total,
+        'items' => $items
+    ];
 }
 
     // =========================
@@ -159,7 +193,8 @@ public function studentInfo(Request $req)
     $admission = $student->admissions()->latest()->first();
 
     // ✅ আগে $amount define করো
-    $amount = $this->getStudentFeeAmount($student);
+    $monthlyFees   = $this->getStudentFeeAmount($student, 'monthly');
+    $admissionFees = $this->getStudentFeeAmount($student, 'admission');
 
     // ✅ তারপর voucher
     $lastVoucher = \App\Models\FeeCollection::max('receipt_no');
@@ -173,10 +208,10 @@ public function studentInfo(Request $req)
         'Jul','Aug','Sep','Oct','Nov','Dec'
     ];
 
-    $monthList = collect($months)->map(function ($m) use ($payments, $amount) {
+    $monthList = collect($months)->map(function ($m) use ($payments, $monthlyFees) {
         return [
             'name'      => $m,
-            'fee'       => (float) $amount,
+            'fee' => (float) $monthlyFees['total'],
             'is_paid'   => $payments
                             ->where('month', $m)
                             ->where('pay_type', 'monthly')
@@ -186,7 +221,8 @@ public function studentInfo(Request $req)
         ];
     });
 
-    $total    = $amount * 12;
+    $total = ($monthlyFees['total'] * 12)
+       + $admissionFees['total'];
     $paid     = $payments->sum('paid_amount');
     $discount = $payments->sum('discount');
     $due      = $total - ($paid + $discount);
@@ -210,6 +246,8 @@ public function studentInfo(Request $req)
             'discount' => $discount,
             'due'      => $due,
         ],
+        'admissionFees' => $admissionFees['items'],
+        'monthlyFees'   => $monthlyFees['items'],
         'monthList' => $monthList
     ]);
 }

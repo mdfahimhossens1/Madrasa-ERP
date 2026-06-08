@@ -59,6 +59,11 @@ class FeeGroup extends Model
         return $this->hasMany(FeeCollection::class);
     }
 
+    public function feeSettings()
+{
+    return $this->hasMany(FeeSetting::class);
+}
+
     /*
     |--------------------------------------------------------------------------
     | Scopes

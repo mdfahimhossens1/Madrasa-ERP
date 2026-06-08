@@ -12,7 +12,7 @@ class FeeSetting extends Model
     protected $fillable = [
         'academic_year_id',
         'class_id',
-        'sub_ledger_id',
+        'fee_group_id',   
         'madrasa_id',
         'chattra_abashik_new',
         'chattra_abashik_old',
@@ -49,9 +49,8 @@ class FeeSetting extends Model
         return $this->belongsTo(Classes::class, 'class_id');
     }
 
-    public function subLedger()
+    public function feeGroup()
     {
-        return $this->belongsTo(SubLedger::class);
+        return $this->belongsTo(FeeGroup::class);
     }
-
 }

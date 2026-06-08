@@ -60,114 +60,127 @@ private function getStudentFeeAmount($student, $payType = 'monthly')
     $admission = $student->admissions()->latest()->first();
 
     if (!$admission) {
-        return [
-            'total' => 0,
-            'items' => []
-        ];
+        return ['total' => 0, 'items' => []];
     }
 
-    $feeSettings = FeeSetting::with('subLedger')
+    $madrasaId = auth()->user()->madrasa_id ?? 1;
+
+    // ✅ FeeGroup type দিয়ে filter করো — এটাই মূল fix
+    // monthly → type = 'monthly'
+    // admission → type = 'ekkalin'
+    $feeGroupType = $payType === 'monthly' ? 'monthly' : 'ekkalin';
+
+    // ✅ FeeSetting গুলো নিয়ে আসো FeeGroup এর সাথে join করে
+    // শুধু সেই FeeGroup গুলো যার type match করে
+    $feeSettings = FeeSetting::with(['feeGroup.subLedger'])
+        ->where('madrasa_id', $madrasaId)
         ->where('academic_year_id', $admission->academic_year_id)
         ->where('class_id', $admission->class_id)
+        ->whereHas('feeGroup', function ($q) use ($feeGroupType) {
+            $q->where('type', $feeGroupType)
+              ->where('is_active', 1);
+        })
         ->get();
 
+    // class specific না পেলে global try করো
     if ($feeSettings->isEmpty()) {
-        return [
-            'total' => 0,
-            'items' => []
-        ];
+        $feeSettings = FeeSetting::with(['feeGroup.subLedger'])
+            ->where('madrasa_id', $madrasaId)
+            ->where('academic_year_id', $admission->academic_year_id)
+            ->whereNull('class_id')
+            ->whereHas('feeGroup', function ($q) use ($feeGroupType) {
+                $q->where('type', $feeGroupType)
+                  ->where('is_active', 1);
+            })
+            ->get();
+    }
+
+    if ($feeSettings->isEmpty()) {
+        return ['total' => 0, 'items' => []];
     }
 
     $gender   = $student->user->gender;
-    $resident = $admission->residence_status;
-    $type     = $admission->admission_type;
+    $resident = $admission->residence_status; // resident/non-resident/daycare/nightcare
+    $type     = $admission->admission_type;   // new/old
 
     $total = 0;
     $items = [];
 
-    foreach ($feeSettings as $fee) {
+    foreach ($feeSettings as $feeSetting) {
 
-        $feeType = $fee->subLedger?->fee_type;
+        $amount = $this->extractAmount($feeSetting, $gender, $resident, $type);
 
-        if ($payType == 'monthly' && $feeType != 'monthly') {
-            continue;
-        }
-
-        if ($payType == 'admission' && $feeType == 'monthly') {
-            continue;
-        }
-
-        $amount = 0;
-
-        if ($gender == 'male') {
-
-            if ($resident == 'resident') {
-                $amount = $type == 'new'
-                    ? $fee->chattra_abashik_new
-                    : $fee->chattra_abashik_old;
-            }
-
-            elseif ($resident == 'non_resident') {
-                $amount = $type == 'new'
-                    ? $fee->chattra_onabashik_new
-                    : $fee->chattra_onabashik_old;
-            }
-
-            elseif ($resident == 'day_care') {
-                $amount = $type == 'new'
-                    ? $fee->chattra_dekeyr_new
-                    : $fee->chattra_dekeyr_old;
-            }
-
-            elseif ($resident == 'night_care') {
-                $amount = $type == 'new'
-                    ? $fee->chattra_nightcare_new
-                    : $fee->chattra_nightcare_old;
-            }
-
-        } else {
-
-            if ($resident == 'resident') {
-                $amount = $type == 'new'
-                    ? $fee->chhatri_abashik_new
-                    : $fee->chhatri_abashik_old;
-            }
-
-            elseif ($resident == 'non_resident') {
-                $amount = $type == 'new'
-                    ? $fee->chhatri_onabashik_new
-                    : $fee->chhatri_onabashik_old;
-            }
-
-            elseif ($resident == 'day_care') {
-                $amount = $type == 'new'
-                    ? $fee->chhatri_dekeyr_new
-                    : $fee->chhatri_dekeyr_old;
-            }
-
-            elseif ($resident == 'night_care') {
-                $amount = $type == 'new'
-                    ? $fee->chhatri_nightcare_new
-                    : $fee->chhatri_nightcare_old;
-            }
-        }
+        if ($amount <= 0) continue;
 
         $items[] = [
-            'fee_setting_id' => $fee->id,
-            'fee_name'       => $fee->subLedger?->name,
-            'fee_type'       => $feeType,
-            'amount'         => (float)$amount,
+            'fee_setting_id' => $feeSetting->id,
+            'fee_group_id'   => $feeSetting->feeGroup?->id,
+            'fee_name'       => $feeSetting->feeGroup?->subLedger?->name
+                                ?? $feeSetting->feeGroup?->name
+                                ?? 'ফি',
+            'fee_type'       => $feeSetting->feeGroup?->type,
+            'amount'         => $amount,
         ];
 
         $total += $amount;
     }
 
-    return [
-        'total' => $total,
-        'items' => $items
-    ];
+    return ['total' => $total, 'items' => $items];
 }
 
+// ✅ amount extract করার logic আলাদা method এ রাখো
+private function extractAmount($feeSetting, $gender, $resident, $type)
+{
+    $amount = 0;
+
+    if ($gender === 'male') {
+        if ($resident === 'resident') {
+            $amount = $type === 'new'
+                ? $feeSetting->chattra_abashik_new
+                : $feeSetting->chattra_abashik_old;
+
+        } elseif ($resident === 'non-resident') {
+            $amount = $type === 'new'
+                ? $feeSetting->chattra_onabashik_new
+                : $feeSetting->chattra_onabashik_old;
+
+        } elseif ($resident === 'daycare') {
+            $amount = $type === 'new'
+                ? $feeSetting->chattra_dekeyr_new
+                : $feeSetting->chattra_dekeyr_old;
+
+        } elseif ($resident === 'nightcare') {
+            $amount = $type === 'new'
+                ? $feeSetting->chattra_nightcare_new
+                : $feeSetting->chattra_nightcare_old;
+        }
+
+    } else {
+
+        if ($resident === 'resident') {
+            $amount = $type === 'new'
+                ? $feeSetting->chhatri_abashik_new
+                : $feeSetting->chhatri_abashik_old;
+
+        } elseif ($resident === 'non-resident') {
+            $amount = $type === 'new'
+                ? $feeSetting->chhatri_onabashik_new
+                : $feeSetting->chhatri_onabashik_old;
+
+        } elseif ($resident === 'daycare') {
+            $amount = $type === 'new'
+                ? $feeSetting->chhatri_dekeyr_new
+                : $feeSetting->chhatri_dekeyr_old;
+
+        } elseif ($resident === 'nightcare') {
+            $amount = $type === 'new'
+                ? $feeSetting->chhatri_nightcare_new
+                : $feeSetting->chhatri_nightcare_old;
+        }
+    }
+
+    return (float)($amount ?? 0);
+}
     // =========================
     // STUDENT INFO
     // =========================
@@ -227,29 +240,44 @@ public function studentInfo(Request $req)
     $discount = $payments->sum('discount');
     $due      = $total - ($paid + $discount);
 
-    return response()->json([
-        'success'          => true,
-        'voucher_no'       => $nextVoucher,
-        'academic_year_id' => $admission?->academic_year_id,
-        'student' => [
-            'id'          => $user->institution_user_id,
-            'name'        => $user->name_bn,
-            'father_name' => $user->father_name,
-            'mobile'      => $user->phone,
-            'class_name'  => optional($admission?->class)->name_bn ?? '',
-            'photo'       => $user->photo,
-            'remarks'     => $user->guardian_name ?? '',
-        ],
-        'fee' => [
-            'total'    => $total,
-            'paid'     => $paid,
-            'discount' => $discount,
-            'due'      => $due,
-        ],
-        'admissionFees' => $admissionFees['items'],
-        'monthlyFees'   => $monthlyFees['items'],
-        'monthList' => $monthList
-    ]);
+return response()->json([
+    'success'          => true,
+    'voucher_no'       => $nextVoucher,
+    'academic_year_id' => $admission?->academic_year_id,
+    'student' => [
+        'id'          => $user->institution_user_id,
+        'name'        => $user->name_bn,
+        'father_name' => $user->father_name,
+        'mobile'      => $user->phone,
+        'class_name'  => optional($admission?->class)->name_bn ?? '',
+        'photo'       => $user->photo,
+        'remarks'     => $user->guardian_name ?? '',
+    ],
+    'fee' => [
+        'total'    => $total,
+        'paid'     => $paid,
+        'discount' => $discount,
+        'due'      => $due,
+    ],
+    // ✅ JS এ data.admission_fees check করে তাই key একই রাখো
+    'admission_fees' => collect($admissionFees['items'])->map(fn($i) => [
+        'name' => $i['fee_name'],
+        'fee'  => $i['amount'],
+    ])->values()->all(),
+    'monthList' => $monthList,
+    '_debug' => [
+    'gender'    => $student->user->gender,
+    'resident'  => $admission?->residence_status,
+    'adm_type'  => $admission?->admission_type,
+    'year_id'   => $admission?->academic_year_id,
+    'class_id'  => $admission?->class_id,
+    'monthly_total'   => $monthlyFees['total'],
+    'admission_total' => $admissionFees['total'],
+    'fee_count' => FeeSetting::where('academic_year_id', $admission?->academic_year_id)
+                    ->where('class_id', $admission?->class_id)
+                    ->count(),
+],
+]);
 }
 
 
@@ -258,7 +286,7 @@ public function studentInfo(Request $req)
     // SAVE PAYMENT
     // =========================
 
- public function savePayment(Request $req)
+public function savePayment(Request $req)
 {
     try {
         $student = Student::with('user')
@@ -271,7 +299,6 @@ public function studentInfo(Request $req)
             return response()->json(['success' => false, 'message' => 'Student not found']);
         }
 
-        // ✅ FeeCollection table এর last receipt_no থেকে next নাও
         $lastReceipt = \App\Models\FeeCollection::max('receipt_no');
         $receiptNo   = $lastReceipt ? $lastReceipt + 1 : 4001;
 
@@ -281,7 +308,6 @@ public function studentInfo(Request $req)
             if ($cashier) $cashierId = $cashier->id;
         }
 
-        // payment method info
         $pmId = $req->payment_method_id ?? null;
 
         if ($req->pay_type === 'monthly') {
@@ -290,7 +316,6 @@ public function studentInfo(Request $req)
             $paidMonths = [];
 
             foreach ($months as $m) {
-
                 $deposit  = (float)($m['deposit']  ?? 0);
                 $discount = (float)($m['discount'] ?? 0);
                 $fee      = (float)($m['fee']      ?? $deposit);
@@ -314,12 +339,11 @@ public function studentInfo(Request $req)
                 ]);
 
                 $paidMonths[] = $m['name'];
-                $receiptNo++;   // প্রতি মাসের জন্য আলাদা receipt চাইলে, না চাইলে বাইরে রাখো
+                $receiptNo++;
             }
 
         } else {
 
-            // admission
             $admItems      = $req->admission_items ?? [];
             $totalDeposit  = collect($admItems)->sum('deposit');
             $totalDiscount = collect($admItems)->sum('discount');
@@ -346,21 +370,23 @@ public function studentInfo(Request $req)
             $paidMonths = [];
         }
 
-        // updated fee summary
-        $allPayments   = \App\Models\FeeCollection::where('student_id', $student->id)->get();
-        $feeAmount     = $this->getStudentFeeAmount($student);
-        $totalPaid     = $allPayments->sum('paid_amount');
-        $totalDiscount = $allPayments->sum('discount');
+        // ✅ updated fee summary — getStudentFeeAmount এখন array তাই সঠিকভাবে নাও
+        $allPayments    = \App\Models\FeeCollection::where('student_id', $student->id)->get();
+        $monthlyFees    = $this->getStudentFeeAmount($student, 'monthly');
+        $admissionFees  = $this->getStudentFeeAmount($student, 'admission');
+        $totalFeeYear   = ($monthlyFees['total'] * 12) + $admissionFees['total'];
+        $totalPaid      = $allPayments->sum('paid_amount');
+        $totalDiscount  = $allPayments->sum('discount');
 
         return response()->json([
             'success'    => true,
-            'voucher_no' => $lastReceipt ? \App\Models\FeeCollection::max('receipt_no') : $receiptNo,
+            'voucher_no' => \App\Models\FeeCollection::max('receipt_no'),
             'paidMonths' => $paidMonths,
             'fee' => [
-                'total'    => $feeAmount * 12,
+                'total'    => $totalFeeYear,
                 'paid'     => $totalPaid,
                 'discount' => $totalDiscount,
-                'due'      => max(0, ($feeAmount * 12) - $totalPaid - $totalDiscount),
+                'due'      => max(0, $totalFeeYear - $totalPaid - $totalDiscount),
             ]
         ]);
 

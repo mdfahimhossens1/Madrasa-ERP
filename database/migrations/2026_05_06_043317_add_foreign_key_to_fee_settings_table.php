@@ -9,17 +9,18 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('fee_settings', function (Blueprint $table) {
-            $table->foreign('sub_ledger_id')
-                  ->references('id')
-                  ->on('sub_ledgers')
-                  ->nullOnDelete();
+          $table->foreignId('fee_group_id')
+          ->nullable()
+          ->after('class_id')
+          ->constrained('fee_groups')
+          ->nullOnDelete();
         });
     }
 
     public function down(): void
     {
         Schema::table('fee_settings', function (Blueprint $table) {
-            $table->dropForeign(['sub_ledger_id']);
+            $table->dropForeign(['fee_group_id']);
         });
     }
 };

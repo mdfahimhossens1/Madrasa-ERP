@@ -14,6 +14,8 @@ class FeeCollection extends Model
     protected $fillable = [
         'madrasa_id',
         'student_id',
+        'fee_setting_id',
+        'sub_ledger_id',
         'receipt_no',
         'collection_date',
         'total_amount',

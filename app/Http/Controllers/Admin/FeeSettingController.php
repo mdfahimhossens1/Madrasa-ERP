@@ -6,17 +6,12 @@ use App\Http\Controllers\Controller;
 use App\Models\AcademicYear;
 use App\Models\Classes;
 use App\Models\FeeSetting;
-use App\Models\SubLedger;
+use App\Models\FeeGroup;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 
 class FeeSettingController extends Controller
 {
-    /**
-     * =========================
-     * INDEX
-     * =========================
-     */
     public function index()
     {
         $madrasaId = auth()->user()->madrasa_id;
@@ -29,11 +24,15 @@ class FeeSettingController extends Controller
             ->orderBy('name')
             ->get();
 
-        $subLedgers = SubLedger::where('madrasa_id', $madrasaId)
-            ->orderBy('name')
-            ->get();
+        // ✅ SubLedger এর বদলে FeeGroup
+    $feeGroups = FeeGroup::with('subLedger') 
+        ->where('madrasa_id', $madrasaId)
+        ->where('is_active', 1)
+        ->orderBy('name')
+        ->get();
 
-        $feeSettings = FeeSetting::with(['academicYear', 'class', 'subLedger'])
+        // ✅ subLedger এর বদলে feeGroup relation
+        $feeSettings = FeeSetting::with(['academicYear', 'class', 'feeGroup.subLedger'])
             ->where('madrasa_id', $madrasaId)
             ->latest()
             ->get();
@@ -41,22 +40,17 @@ class FeeSettingController extends Controller
         return view('admin.fee-settings.index', compact(
             'academicYears',
             'classes',
-            'subLedgers',
+            'feeGroups',
             'feeSettings'
         ));
     }
 
-    /**
-     * =========================
-     * GET SINGLE FEE DATA (AJAX)
-     * =========================
-     */
     public function get(Request $request)
     {
         $request->validate([
             'academic_year_id' => 'required|exists:academic_years,id',
             'class_id'         => 'nullable|exists:classes,id',
-            'sub_ledger_id'    => 'required|exists:sub_ledgers,id',
+            'fee_group_id'     => 'required|exists:fee_groups,id', // ✅
         ]);
 
         try {
@@ -64,18 +58,13 @@ class FeeSettingController extends Controller
 
             $query = FeeSetting::where('madrasa_id', $madrasaId)
                 ->where('academic_year_id', $request->academic_year_id)
-                ->where('sub_ledger_id', $request->sub_ledger_id);
+                ->where('fee_group_id', $request->fee_group_id); // ✅
 
-            // =========================
-            // CLASS PRIORITY FIX
-            // =========================
             if ($request->class_id) {
-
                 $query->where(function ($q) use ($request) {
                     $q->where('class_id', $request->class_id)
                       ->orWhereNull('class_id');
                 });
-
             } else {
                 $query->whereNull('class_id');
             }
@@ -88,92 +77,56 @@ class FeeSettingController extends Controller
             ]);
 
         } catch (\Exception $e) {
-
             Log::error('FeeSetting GET error: ' . $e->getMessage());
-
-            return response()->json([
-                'success' => false,
-                'message' => 'Server error'
-            ], 500);
+            return response()->json(['success' => false, 'message' => 'Server error'], 500);
         }
     }
 
-    /**
-     * =========================
-     * SAVE / UPDATE
-     * =========================
-     */
     public function save(Request $request)
     {
         $request->validate([
             'academic_year_id' => 'required|exists:academic_years,id',
             'class_id'         => 'nullable|exists:classes,id',
-            'sub_ledger_id'    => 'required|exists:sub_ledgers,id',
+            'fee_group_id'     => 'required|exists:fee_groups,id', // ✅
         ]);
 
         try {
-
             $madrasaId = auth()->user()->madrasa_id;
 
             $data = $request->only([
-                'chattra_abashik_new',
-                'chattra_abashik_old',
-                'chattra_onabashik_new',
-                'chattra_onabashik_old',
-                'chattra_dekeyr_new',
-                'chattra_dekeyr_old',
-                'chattra_nightcare_new',
-                'chattra_nightcare_old',
-                'chhatri_abashik_new',
-                'chhatri_abashik_old',
-                'chhatri_onabashik_new',
-                'chhatri_onabashik_old',
-                'chhatri_dekeyr_new',
-                'chhatri_dekeyr_old',
-                'chhatri_nightcare_new',
-                'chhatri_nightcare_old'
+                'chattra_abashik_new', 'chattra_abashik_old',
+                'chattra_onabashik_new', 'chattra_onabashik_old',
+                'chattra_dekeyr_new', 'chattra_dekeyr_old',
+                'chattra_nightcare_new', 'chattra_nightcare_old',
+                'chhatri_abashik_new', 'chhatri_abashik_old',
+                'chhatri_onabashik_new', 'chhatri_onabashik_old',
+                'chhatri_dekeyr_new', 'chhatri_dekeyr_old',
+                'chhatri_nightcare_new', 'chhatri_nightcare_old',
             ]);
 
-            $data['madrasa_id'] = $madrasaId;
+            $data['madrasa_id']       = $madrasaId;
             $data['academic_year_id'] = $request->academic_year_id;
-            $data['class_id'] = $request->class_id ?: null;
-            $data['sub_ledger_id'] = $request->sub_ledger_id;
+            $data['class_id']         = $request->class_id ?: null;
+            $data['fee_group_id']     = $request->fee_group_id;
 
-            // =========================
-            // SAFE UPSERT
-            // =========================
-            $record = FeeSetting::updateOrCreate(
+            FeeSetting::updateOrCreate(
                 [
                     'madrasa_id'       => $madrasaId,
                     'academic_year_id' => $data['academic_year_id'],
                     'class_id'         => $data['class_id'],
-                    'sub_ledger_id'    => $data['sub_ledger_id'],
+                    'fee_group_id'     => $data['fee_group_id'],
                 ],
                 $data
             );
 
-            return response()->json([
-                'success' => true,
-                'message' => 'ফি সেটিংস সফলভাবে সেভ হয়েছে!',
-                'data'    => $record
-            ]);
+            return response()->json(['success' => true, 'message' => 'ফি সেটিংস সফলভাবে সেভ হয়েছে!']);
 
         } catch (\Exception $e) {
-
             Log::error('FeeSetting SAVE error: ' . $e->getMessage());
-
-            return response()->json([
-                'success' => false,
-                'message' => 'Save failed'
-            ], 500);
+            return response()->json(['success' => false, 'message' => 'Save failed'], 500);
         }
     }
 
-    /**
-     * =========================
-     * RESET
-     * =========================
-     */
     public function reset(Request $request)
     {
         $request->validate([
@@ -181,26 +134,17 @@ class FeeSettingController extends Controller
         ]);
 
         try {
-
             $madrasaId = auth()->user()->madrasa_id;
 
             FeeSetting::where('madrasa_id', $madrasaId)
                 ->where('academic_year_id', $request->academic_year_id)
                 ->delete();
 
-            return response()->json([
-                'success' => true,
-                'message' => 'রিসেট সম্পন্ন হয়েছে!'
-            ]);
+            return response()->json(['success' => true, 'message' => 'রিসেট সম্পন্ন হয়েছে!']);
 
         } catch (\Exception $e) {
-
             Log::error('FeeSetting RESET error: ' . $e->getMessage());
-
-            return response()->json([
-                'success' => false,
-                'message' => 'Reset failed'
-            ], 500);
+            return response()->json(['success' => false, 'message' => 'Reset failed'], 500);
         }
     }
 }

@@ -380,11 +380,13 @@
     <div class="filter-group">
       <label>ফি এর নাম<span class="required">*</span> :</label>
       <div class="input-with-btn">
-        <select id="fee-type-select" onchange="loadFeeData()">
-          <option value="">নির্বাচন করুন</option>
-          @foreach($subLedgers as $type)
-            <option value="{{ $type->id }}">{{ $type->name }}</option>
-          @endforeach
+        <select id="fee-group-select" onchange="loadFeeData()">
+            <option value="">নির্বাচন করুন</option>
+            @foreach($feeGroups as $group)
+                <option value="{{ $group->id }}">
+                    {{ $group->subLedger?->name ?? $group->name ?? '—' }}
+                </option>
+            @endforeach
         </select>
       </div>
     </div>
@@ -688,9 +690,9 @@ const state = {
 };
 
 function updateState() {
-  state.academicYearId = document.getElementById('academic-year-select')?.value || null;
-  state.classId        = document.getElementById('class-select')?.value || null;
-  state.subLedgerId    = document.getElementById('fee-type-select')?.value || null;
+    state.academicYearId = document.getElementById('academic-year-select')?.value || null;
+    state.classId        = document.getElementById('class-select')?.value || null;
+    state.feeGroupId     = document.getElementById('fee-group-select')?.value || null; // ✅
 }
 
 // =========================
@@ -710,13 +712,13 @@ async function safeFetch(url, options = {}) {
 // LOAD FEE DATA
 // =========================
 async function loadFeeData() {
-  updateState();
-  if (!state.academicYearId || !state.subLedgerId) return;
+    updateState();
+    if (!state.academicYearId || !state.feeGroupId) return; // ✅
 
-  const GET_URL = "{{ route('dashboard.fee-settings.get') }}";
-  const url = `${GET_URL}?academic_year_id=${state.academicYearId}&class_id=${state.classId || ''}&sub_ledger_id=${state.subLedgerId}`;
+    const GET_URL = "{{ route('dashboard.fee-settings.get') }}";
+    const url = `${GET_URL}?academic_year_id=${state.academicYearId}&class_id=${state.classId || ''}&fee_group_id=${state.feeGroupId}`; // ✅
 
-  const result = await safeFetch(url);
+    const result = await safeFetch(url);
 
   if (!result.success || !result.data) {
     ALL_INPUT_IDS.forEach(id => {
@@ -737,15 +739,15 @@ async function loadFeeData() {
 // SAVE FORM
 // =========================
 async function saveForm() {
-  updateState();
-  if (!state.academicYearId) return alert('একাডেমিক ইয়ার নির্বাচন করুন!');
-  if (!state.subLedgerId)    return alert('ফি টাইপ নির্বাচন করুন!');
+    updateState();
+    if (!state.academicYearId) return alert('একাডেমিক ইয়ার নির্বাচন করুন!');
+    if (!state.feeGroupId)     return alert('ফি এর নাম নির্বাচন করুন!'); // ✅
 
-  const payload = {
-    academic_year_id: state.academicYearId,
-    class_id:         state.classId || null,
-    sub_ledger_id:    state.subLedgerId,
-  };
+    const payload = {
+        academic_year_id: state.academicYearId,
+        class_id:         state.classId || null,
+        fee_group_id:     state.feeGroupId, // ✅ sub_ledger_id → fee_group_id
+    };
 
   Object.keys(FIELD_MAP).forEach(id => {
     const el = document.getElementById(id);

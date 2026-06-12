@@ -10,6 +10,10 @@ use App\Models\Cashier;
 use App\Models\StudentPayment;
 use App\Models\FeeSetting;
 use App\Models\Admission;
+use App\Models\Fund;
+use App\Models\Ledger;
+use App\Models\Transaction;
+use App\Models\TransactionItem;
 use Illuminate\Http\Request;
 
 class StudentFeeCollectionController extends Controller
@@ -128,7 +132,39 @@ private function getStudentFeeAmount($student, $payType = 'monthly')
     return ['total' => $total, 'items' => $items];
 }
 
-// ✅ amount extract করার logic আলাদা method এ রাখো
+private function getFeeFundAndLedger(): array
+{
+    $madrasaId = auth()->user()->madrasa_id ?? 1;
+
+    // ফান্ড — না থাকলে প্রথমটা নাও, একেবারেই না থাকলে তৈরি করো
+    $fund = Fund::where('madrasa_id', $madrasaId)->first();
+
+    if (!$fund) {
+        $fund = Fund::create([
+            'madrasa_id' => $madrasaId,
+            'name'       => 'সাধারণ ফান্ড',
+        ]);
+    }
+
+    // লেজার — fee income এর জন্য 'ছাত্র বেতন' নামে খুঁজবে, না থাকলে তৈরি করবে
+    $ledger = Ledger::where('madrasa_id', $madrasaId)
+        ->where('fund_id', $fund->id)
+        ->where('name', 'ছাত্র বেতন')
+        ->first();
+
+    if (!$ledger) {
+        $ledger = Ledger::create([
+            'madrasa_id' => $madrasaId,
+            'user_id'    => auth()->id(),
+            'name'       => 'ছাত্র বেতন',
+            'type'       => 'income',
+            'fund_id'    => $fund->id,
+        ]);
+    }
+
+    return ['fund' => $fund, 'ledger' => $ledger];
+}
+
 private function extractAmount($feeSetting, $gender, $resident, $type)
 {
     $amount = 0;
@@ -310,7 +346,7 @@ public function savePayment(Request $req)
 
         $pmId = $req->payment_method_id ?? null;
 
-        if ($req->pay_type === 'monthly') {
+if ($req->pay_type === 'monthly') {
 
             $months     = $req->months ?? [];
             $paidMonths = [];
@@ -321,7 +357,7 @@ public function savePayment(Request $req)
                 $fee      = (float)($m['fee']      ?? $deposit);
                 $due      = max(0, $fee - $discount - $deposit);
 
-                \App\Models\FeeCollection::create([
+                $feeCollection = \App\Models\FeeCollection::create([
                     'madrasa_id'        => auth()->user()->madrasa_id ?? 1,
                     'student_id'        => $student->id,
                     'receipt_no'        => $receiptNo,
@@ -338,6 +374,17 @@ public function savePayment(Request $req)
                     'collected_by'      => $cashierId ?? auth()->id(),
                 ]);
 
+                if ($deposit > 0) {
+                    $description = sprintf(
+                        'ছাত্র: %s (ID: %s) — %s মাসের বেতন%s',
+                        $student->user->name_bn ?? $student->user->name ?? '',
+                        $student->user->institution_user_id ?? '',
+                        $m['name'],
+                        $discount > 0 ? " — কর্তন: ৳{$discount}" : ''
+                    );
+                    $this->createFeeTransaction($feeCollection, $req, $description);
+                }
+
                 $paidMonths[] = $m['name'];
                 $receiptNo++;
             }
@@ -350,7 +397,7 @@ public function savePayment(Request $req)
             $totalFee      = collect($admItems)->sum('fee');
             $due           = max(0, $totalFee - $totalDiscount - $totalDeposit);
 
-            \App\Models\FeeCollection::create([
+            $feeCollection = \App\Models\FeeCollection::create([
                 'madrasa_id'        => auth()->user()->madrasa_id ?? 1,
                 'student_id'        => $student->id,
                 'receipt_no'        => $receiptNo,
@@ -366,6 +413,16 @@ public function savePayment(Request $req)
                 'note'              => $req->note,
                 'collected_by'      => $cashierId ?? auth()->id(),
             ]);
+
+            if ($totalDeposit > 0) {
+                $description = sprintf(
+                    'ছাত্র: %s (ID: %s) — ভর্তি ফি%s',
+                    $student->user->name_bn ?? $student->user->name ?? '',
+                    $student->user->institution_user_id ?? '',
+                    $totalDiscount > 0 ? " — কর্তন: ৳{$totalDiscount}" : ''
+                );
+                $this->createFeeTransaction($feeCollection, $req, $description);
+            }
 
             $paidMonths = [];
         }
@@ -536,4 +593,30 @@ public function addCashier(Request $request)
         $payment = \App\Models\FeeCollection::with(['student.user', 'collector'])->findOrFail($id);
         return view('admin.fee-collection.receipt', compact('payment'));
     }
+
+    private function createFeeTransaction($feeCollection, Request $req, string $description): void
+{
+    [$fund, $ledger] = array_values($this->getFeeFundAndLedger());
+
+    $cashierId = $feeCollection->collected_by;
+
+    $transaction = Transaction::create([
+        'voucher_no'        => $feeCollection->receipt_no,
+        'type'              => 'income',
+        'fund_id'           => $fund->id,
+        'payment_method_id' => $feeCollection->payment_method_id,
+        'cashier_id'        => $cashierId,
+        'total_amount'      => $feeCollection->paid_amount,
+        'date'              => $feeCollection->collection_date,
+        'note'              => $req->note,
+    ]);
+
+    TransactionItem::create([
+        'transaction_id' => $transaction->id,
+        'ledger_id'      => $ledger->id,
+        'sub_ledger_id'  => null,
+        'amount'         => $feeCollection->paid_amount,
+        'description'    => $description,
+    ]);
+}
 }

@@ -796,36 +796,35 @@
         </div>
         <table class="data-table" id="paymentTable">
             <thead>
-                <tr>
-                    <th>তারিখ ও সময়</th>
-                    <th>আইডি</th>
-                    <th>শিক্ষার্থীর নাম</th>
-                    <th>মাস</th>
-                    <th>পরিমাণ</th>
-                    <th>ছাড়</th>
-                    <th>মাধ্যম</th>
-                    <th>গ্রহণকারী</th>
-                    <th>ভাউচার</th>
-                    <th>আকশন</th>
-                </tr>
+            <tr>
+                <th>আকশন</th>
+                <th>আইডি</th>
+                <th>শিক্ষার্থীর নাম</th>
+                <th>পরিমাণ</th>
+                <th>ছাড়</th>
+                <th>মাধ্যম</th>
+                <th>গ্রহণকারী</th>
+                <th>ভাউচার</th>
+                <th>তারিখ ও সময়</th>
+            </tr>
             </thead>
             <tbody id="paymentTableBody">
                 @isset($payments)
                 @foreach($payments as $payment)
                 <tr>
-                    <td>
-                        <div class="td-date">{{ \Carbon\Carbon::parse($payment->payment_date)->format('d/m/Y') }}</div>
-                        <div class="td-time">{{ \Carbon\Carbon::parse($payment->created_at)->format('h:i A') }}</div>
-                    </td>
+<td><button class="btn-print" onclick="printReceipt({{ $payment->id }})" title="প্রিন্ট"><i class="fas fa-print"></i></button></td>
                     <td>{{ $payment->student_id }}</td>
                     <td class="td-name">{{ $payment->student_name }}</td>
-                    <td>{{ $payment->month }}</td>
                     <td class="td-amount">৳ {{ number_format($payment->amount) }}</td>
                     <td class="td-discount">৳ {{ number_format($payment->discount ?? 0) }}</td>
                     <td><span class="badge-method badge-{{ strtolower($payment->method) }}">{{ $payment->method }}</span></td>
                     <td>{{ $payment->cashier_name }}</td>
                     <td style="color:#6b7280;font-size:12px;">{{ $payment->voucher_no ?? '—' }}</td>
-                    <td><button class="btn-print" onclick="printReceipt({{ $payment->id }})" title="প্রিন্ট"><i class="fas fa-print"></i></button></td>
+                    
+                                        <td>
+                        <div class="td-date">{{ \Carbon\Carbon::parse($payment->payment_date)->format('d/m/Y') }}</div>
+                        <div class="td-time">{{ \Carbon\Carbon::parse($payment->created_at)->format('h:i A') }}</div>
+                    </td>
                 </tr>
                 @endforeach
                 @endisset
@@ -1943,22 +1942,21 @@ function refreshTodayTable() {
         data.payments.forEach(p => {
             const mc = (p.method ?? 'cash').toLowerCase();
             rows += `<tr>
-                <td><div class="td-date">${formatDate(p.payment_date)}</div>
-                    <div class="td-time">${formatTime(p.created_at)}</div></td>
+                <td><button class="btn-print" onclick="printReceipt(${p.id})" title="প্রিন্ট">
+                    <i class="fas fa-print"></i></button></td>
                 <td>${p.student_id}</td>
                 <td class="td-name">${p.student_name}</td>
-                <td>${p.month ?? '—'}</td>
                 <td class="td-amount">৳ ${Number(p.amount).toLocaleString()}</td>
                 <td class="td-discount">৳ ${Number(p.discount ?? 0).toLocaleString()}</td>
                 <td><span class="badge-method badge-${mc}">${p.method}</span></td>
                 <td>${p.cashier_name ?? '—'}</td>
                 <td style="color:#6b7280;font-size:12px;">${p.voucher_no ?? '—'}</td>
-                <td><button class="btn-print" onclick="printReceipt(${p.id})" title="প্রিন্ট">
-                    <i class="fas fa-print"></i></button></td>
+                <td><div class="td-date">${formatDate(p.payment_date)}</div>
+                    <div class="td-time">${formatTime(p.created_at)}</div></td>
             </tr>`;
         });
         document.getElementById('paymentTableBody').innerHTML =
-            rows || '<tr><td colspan="10" class="no-data">কোনো পেমেন্ট নেই</td></tr>';
+            rows || '<tr><td colspan="9" class="no-data">কোনো পেমেন্ট নেই</td></tr>';
     })
     .catch(err => console.error(err));
 }

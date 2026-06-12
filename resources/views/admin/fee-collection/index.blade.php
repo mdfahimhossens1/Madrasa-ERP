@@ -1469,8 +1469,19 @@ function renderAdmFeeItems() {
 }
 
 function updateAdmItem(idx, field, val) {
-    admissionFeeItems[idx][field] = Number(val) || 0;
-    updateAdmTotal();
+    val = Number(val) || 0;
+    const item = admissionFeeItems[idx];
+
+    if (field === 'discount') {
+        val = Math.min(val, item.fee);
+        item.discount = val;
+        item.deposit = Math.max(0, item.fee - val);
+    } else if (field === 'deposit') {
+        val = Math.min(val, item.fee - item.discount);
+        item.deposit = Math.max(0, val);
+    }
+
+    renderAdmFeeItems();
 }
 
 function updateAdmTotal() {

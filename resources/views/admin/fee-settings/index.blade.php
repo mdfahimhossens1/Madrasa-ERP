@@ -593,7 +593,7 @@
       <tr>
         <td>{{ $item->academicYear->name_bn ?? '-' }}</td>
         <td>{{ $item->class->name_bn ?? 'সকল শ্রেণি' }}</td>
-        <td>{{ $item->subLedger->name ?? '-' }}</td>
+        <td>{{ $item->feeGroup->subLedger->name ?? '-' }}</td>
 
         {{-- ছাত্র --}}
         <td>

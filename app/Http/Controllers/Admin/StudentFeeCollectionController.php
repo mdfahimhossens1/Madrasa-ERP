@@ -30,10 +30,16 @@ public function index()
         ->whereDate('collection_date', today())
         ->sum('paid_amount');
 
-    $myTotal = \App\Models\FeeCollection::where('madrasa_id', $madrasaId)
-        ->whereDate('collection_date', today())
-        ->where('collected_by', auth()->id())
-        ->sum('paid_amount');
+    // ✅ 'আমার সংগ্রহ' = ফর্মে সিলেক্ট করা cashier-এর আজকের কালেকশন।
+    // পেজ লোডে যেহেতু এখনো কোনো cashier সিলেক্ট করা থাকে না (প্রথম cashier-টি ডিফল্ট
+    // active দেখানো হয় UI-তে), তাই প্রথম cashier ধরে initial value বের করছি।
+    $defaultCashierId = $cashiers->first()?->id;
+    $myTotal = $defaultCashierId
+        ? \App\Models\FeeCollection::where('madrasa_id', $madrasaId)
+            ->whereDate('collection_date', today())
+            ->where('collected_by', $defaultCashierId)
+            ->sum('paid_amount')
+        : 0;
 
     $payments = \App\Models\FeeCollection::with(['student.user', 'collector'])
         ->where('madrasa_id', $madrasaId)
@@ -59,6 +65,13 @@ public function index()
     ));
 }
 
+/**
+ * $payType: 'monthly' | 'admission' | 'other'
+ * controller-e 'admission' dile FeeGroup-er type 'ekkalin' hoy.
+ * 'other' dile FeeGroup-er type 'others' hobe — কারণ ছাত্র ফি গ্রুপ ফর্মে
+ * (FeeGroup create form) option value হলো ঠিক 'others', 'other' নয়।
+ * এই mismatch-ই আগে অনন্য ফি কিছু না দেখানোর মূল কারণ ছিল।
+ */
 private function getStudentFeeAmount($student, $payType = 'monthly')
 {
     $admission = $student->admissions()->latest()->first();
@@ -69,13 +82,15 @@ private function getStudentFeeAmount($student, $payType = 'monthly')
 
     $madrasaId = auth()->user()->madrasa_id ?? 1;
 
-    // ✅ FeeGroup type দিয়ে filter করো — এটাই মূল fix
     // monthly → type = 'monthly'
     // admission → type = 'ekkalin'
-    $feeGroupType = $payType === 'monthly' ? 'monthly' : 'ekkalin';
+    // other     → type = 'others'  (ছাত্র ফি গ্রুপ ফর্মের সাথে মিল রেখে — exam fee, library fee ইত্যাদি)
+    $feeGroupType = match ($payType) {
+        'monthly' => 'monthly',
+        'other'   => 'others',
+        default   => 'ekkalin',
+    };
 
-    // ✅ FeeSetting গুলো নিয়ে আসো FeeGroup এর সাথে join করে
-    // শুধু সেই FeeGroup গুলো যার type match করে
     $feeSettings = FeeSetting::with(['feeGroup.subLedger'])
         ->where('madrasa_id', $madrasaId)
         ->where('academic_year_id', $admission->academic_year_id)
@@ -241,9 +256,10 @@ public function studentInfo(Request $req)
     $user = $student->user;
     $admission = $student->admissions()->latest()->first();
 
-    // ✅ আগে $amount define করো
+    // ✅ ৩ ধরনের fee আগে থেকেই বের করে নিচ্ছি — monthly, admission(ekkalin), other(others)
     $monthlyFees   = $this->getStudentFeeAmount($student, 'monthly');
     $admissionFees = $this->getStudentFeeAmount($student, 'admission');
+    $otherFees     = $this->getStudentFeeAmount($student, 'other');
 
     // ✅ তারপর voucher
     $lastVoucher = \App\Models\FeeCollection::max('receipt_no');
@@ -270,8 +286,32 @@ public function studentInfo(Request $req)
         ];
     });
 
+    // ✅ 'other' pay_type এর জন্য প্রতিটি fee item আলাদাভাবে কতটুকু জমা হয়েছে তা বের করছি
+    // (item নামের ভিত্তিতে — savePayment() এ 'other' pay_type এর month কলামে fee item-এর নাম রাখা হয়)
+    $otherPaidByName = $payments->where('pay_type', 'other')
+        ->groupBy('month')
+        ->map(fn($rows) => $rows->sum('paid_amount'));
+
+    $otherItems = collect($otherFees['items'])->map(function ($item) use ($otherPaidByName, $payments) {
+        $prevPaid = $otherPaidByName->get($item['fee_name'], 0);
+        $isPaid   = $payments
+            ->where('pay_type', 'other')
+            ->where('month', $item['fee_name'])
+            ->where('due_amount', 0)
+            ->count() > 0;
+
+        return [
+            'fee_setting_id' => $item['fee_setting_id'],
+            'name'           => $item['fee_name'],
+            'fee'            => $item['amount'],
+            'prev_paid'      => $prevPaid,
+            'is_paid'        => $isPaid,
+        ];
+    })->values();
+
     $total = ($monthlyFees['total'] * 12)
-       + $admissionFees['total'];
+       + $admissionFees['total']
+       + $otherFees['total'];
     $paid     = $payments->sum('paid_amount');
     $discount = $payments->sum('discount');
     $due      = $total - ($paid + $discount);
@@ -289,6 +329,10 @@ return response()->json([
         'photo'       => $user->photo,
         'remarks'     => $user->guardian_name ?? '',
     ],
+    // ✅ এখানে আগের মোট/পরিশোধিত/বকেয়া (overall lifetime) তথ্য পাঠানো হচ্ছে, কিন্তু
+    //    UI এখন এগুলো সরাসরি দেখাবে না — সার্চ করার সাথে সাথে সামারি বক্স ০ দেখাবে।
+    //    base_* দিয়ে frontend এই lifetime ডেটা রেখে দেয় hidden state হিসেবে, যা পরে
+    //    receipt/statement-এর জন্য কাজে লাগতে পারে, কিন্তু fee summary বক্সে দেখানো হবে না।
     'fee' => [
         'total'    => $total,
         'paid'     => $paid,
@@ -300,6 +344,8 @@ return response()->json([
         'name' => $i['fee_name'],
         'fee'  => $i['amount'],
     ])->values()->all(),
+    // ✅ 'অনন্য' fee items (exam fee, library fee ইত্যাদি)
+    'other_fees' => $otherItems,
     'monthList' => $monthList,
     '_debug' => [
     'gender'    => $student->user->gender,
@@ -309,6 +355,7 @@ return response()->json([
     'class_id'  => $admission?->class_id,
     'monthly_total'   => $monthlyFees['total'],
     'admission_total' => $admissionFees['total'],
+    'other_total'     => $otherFees['total'],
     'fee_count' => FeeSetting::where('academic_year_id', $admission?->academic_year_id)
                     ->where('class_id', $admission?->class_id)
                     ->count(),
@@ -346,10 +393,11 @@ public function savePayment(Request $req)
 
         $pmId = $req->payment_method_id ?? null;
 
+        $paidMonths = [];
+
 if ($req->pay_type === 'monthly') {
 
             $months     = $req->months ?? [];
-            $paidMonths = [];
 
             foreach ($months as $m) {
                 $deposit  = (float)($m['deposit']  ?? 0);
@@ -386,6 +434,54 @@ if ($req->pay_type === 'monthly') {
                 }
 
                 $paidMonths[] = $m['name'];
+                $receiptNo++;
+            }
+
+        } elseif ($req->pay_type === 'other') {
+
+            // ✅ 'অনন্য' (exam fee, library fee ইত্যাদি) — popup থেকে আসা প্রতিটি item আলাদা row হিসেবে save হবে
+            // month কলামে fee এর নাম রাখা হচ্ছে যাতে পরে track করা যায় (studentInfo() এ ব্যবহৃত)
+            $items = $req->other_items ?? [];
+
+            foreach ($items as $it) {
+                $deposit  = (float)($it['deposit']  ?? 0);
+                $discount = (float)($it['discount'] ?? 0);
+                $fee      = (float)($it['fee']      ?? $deposit);
+                $due      = max(0, $fee - $discount - $deposit);
+
+                if ($deposit <= 0 && $discount <= 0) {
+                    continue; // কিছুই জমা/কর্তন না হলে স্কিপ
+                }
+
+                $feeCollection = \App\Models\FeeCollection::create([
+                    'madrasa_id'        => auth()->user()->madrasa_id ?? 1,
+                    'student_id'        => $student->id,
+                    'receipt_no'        => $receiptNo,
+                    'collection_date'   => $req->collection_date,
+                    'total_amount'      => $fee,
+                    'discount'          => $discount,
+                    'paid_amount'       => $deposit,
+                    'due_amount'        => $due,
+                    'payment_method_id' => $pmId,
+                    'month'             => $it['name'] ?? null,
+                    'pay_type'          => 'other',
+                    'status'            => $due > 0 ? 'partial' : 'paid',
+                    'note'              => $req->note,
+                    'collected_by'      => $cashierId ?? auth()->id(),
+                ]);
+
+                if ($deposit > 0) {
+                    $description = sprintf(
+                        'ছাত্র: %s (ID: %s) — %s%s',
+                        $student->user->name_bn ?? $student->user->name ?? '',
+                        $student->user->institution_user_id ?? '',
+                        $it['name'] ?? 'অনন্য ফি',
+                        $discount > 0 ? " — কর্তন: ৳{$discount}" : ''
+                    );
+                    $this->createFeeTransaction($feeCollection, $req, $description);
+                }
+
+                $paidMonths[] = $it['name'] ?? null;
                 $receiptNo++;
             }
 
@@ -427,13 +523,27 @@ if ($req->pay_type === 'monthly') {
             $paidMonths = [];
         }
 
-        // ✅ updated fee summary — getStudentFeeAmount এখন array তাই সঠিকভাবে নাও
+        // ✅ updated fee summary
         $allPayments    = \App\Models\FeeCollection::where('student_id', $student->id)->get();
         $monthlyFees    = $this->getStudentFeeAmount($student, 'monthly');
         $admissionFees  = $this->getStudentFeeAmount($student, 'admission');
-        $totalFeeYear   = ($monthlyFees['total'] * 12) + $admissionFees['total'];
+        $otherFees      = $this->getStudentFeeAmount($student, 'other');
+        $totalFeeYear   = ($monthlyFees['total'] * 12) + $admissionFees['total'] + $otherFees['total'];
         $totalPaid      = $allPayments->sum('paid_amount');
         $totalDiscount  = $allPayments->sum('discount');
+
+        // ✅ আজকের সর্বমোট সংগ্রহ (madrasa-wide) ও 'আমার সংগ্রহ' (যে cashier ফর্মে সিলেক্ট করা ছিল)
+        $madrasaId  = auth()->user()->madrasa_id ?? 1;
+        $todayTotal = \App\Models\FeeCollection::where('madrasa_id', $madrasaId)
+            ->whereDate('collection_date', today())
+            ->sum('paid_amount');
+
+        $myTotal = $cashierId
+            ? \App\Models\FeeCollection::where('madrasa_id', $madrasaId)
+                ->whereDate('collection_date', today())
+                ->where('collected_by', $cashierId)
+                ->sum('paid_amount')
+            : 0;
 
         return response()->json([
             'success'    => true,
@@ -444,7 +554,9 @@ if ($req->pay_type === 'monthly') {
                 'paid'     => $totalPaid,
                 'discount' => $totalDiscount,
                 'due'      => max(0, $totalFeeYear - $totalPaid - $totalDiscount),
-            ]
+            ],
+            'todayTotal' => $todayTotal,
+            'myTotal'    => $myTotal,
         ]);
 
     } catch (\Exception $e) {
@@ -482,10 +594,15 @@ public function todayPayments(Request $req)
         ->whereDate('collection_date', today())
         ->sum('paid_amount');
 
-    $myTotal = \App\Models\FeeCollection::where('madrasa_id', $madrasaId)
-        ->whereDate('collection_date', today())
-        ->where('collected_by', auth()->id())
-        ->sum('paid_amount');
+    // ✅ 'আমার সংগ্রহ' এখন request এ আসা cashier_id অনুযায়ী হিসাব হবে
+    // (form-e dropdown-e jei cashier select kora ache, তার আজকের কালেকশন)
+    $cashierId = $req->cashier_id ?? null;
+    $myTotal = $cashierId
+        ? \App\Models\FeeCollection::where('madrasa_id', $madrasaId)
+            ->whereDate('collection_date', today())
+            ->where('collected_by', $cashierId)
+            ->sum('paid_amount')
+        : 0;
 
     return response()->json([
         'success'    => true,
@@ -574,17 +691,20 @@ public function addCashier(Request $request)
     }
 }
 
+    /**
+     * ✅ আয়-ব্যয় ফরমের /dashboard/payment-method/list এর মতো same endpoint structure।
+     */
     public function paymentMethods()
     {
         $userId = auth()->id();
+
+        $all = \App\Models\PaymentMethod::where('user_id', $userId)->get();
+
         return response()->json([
             'success' => true,
-            'mobile'  => \App\Models\PaymentMethod::where('user_id', $userId)
-                            ->where('account_type', 'mobile')->get(),
-            'cash'    => \App\Models\PaymentMethod::where('user_id', $userId)
-                            ->where('account_type', 'cash')->get(),
-            'bank'    => \App\Models\PaymentMethod::where('user_id', $userId)
-                            ->where('account_type', 'bank')->get(),
+            'mobile'  => $all->where('account_type', 'mobile')->values(),
+            'cash'    => $all->where('account_type', 'cash')->values(),
+            'bank'    => $all->where('account_type', 'bank')->values(),
         ]);
     }
 

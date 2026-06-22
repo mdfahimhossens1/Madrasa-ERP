@@ -237,6 +237,7 @@ body { font-family: 'Hind Siliguri', sans-serif; background: var(--bg); }
 .pm-badge.cash   { background: #e8f5e9; color: #2e7d32; }
 .pm-badge.mobile { background: #e3f2fd; color: #1565c0; }
 .pm-badge.bank   { background: #fff3e0; color: #e65100; }
+
 </style>
 
 <div class="outer">

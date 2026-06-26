@@ -2353,8 +2353,6 @@ function showToast(msg, type = 'success') {
 // ================================================================
 document.addEventListener('DOMContentLoaded', () => {
     loadPaymentMethods();
-    // ✅ পেজ লোড হওয়ার সাথে সাথে আজকের সংগ্রহ তথ্য রিফ্রেশ করো
-    // (blade থেকে আসা initial value ব্যাকআপ হিসেবে আগে থেকেই বসানো আছে)
     refreshTodayTable();
 });
 </script>

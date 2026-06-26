@@ -411,7 +411,7 @@ body{ background: var(--bg); color: var(--text); }
         <div class="collapse {{ $open('account.') }}" id="accountMenu">
             <ul class="nav flex-column ms-3">
                 <li><a class="nav-link text-white-50" href="{{route('dashboard.transactions.index')}}" data-submenu="account">আয়-ব্যয়</a></li>
-                <li><a class="nav-link text-white-50" href="#" data-submenu="account">আয়-ব্যয় রিপোর্ট</a></li>
+                <li><a class="nav-link text-white-50" href="{{route('dashboard.reports.income-expense')}}" data-submenu="account">আয়-ব্যয় রিপোর্ট</a></li>
                 <li><a class="nav-link text-white-50" href="{{route('dashboard.fees.index')}}" data-submenu="account">ছাত্র ফি গ্রুপ</a></li>
                 <li><a class="nav-link text-white-50" href="{{route('dashboard.fee-settings.index')}}" data-submenu="account">ফি সেটিং</a></li>
                 <li><a class="nav-link text-white-50" href="{{route('dashboard.fee-collection.index')}}" data-submenu="account">ফি গ্রহণ</a></li>

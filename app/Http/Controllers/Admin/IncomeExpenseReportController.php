@@ -5,6 +5,9 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use App\Models\Transaction;
+use App\Models\PaymentMethod;
+use App\Models\Cashier;
+use App\Models\Fund;
 
 class IncomeExpenseReportController extends Controller
 {
@@ -12,15 +15,53 @@ class IncomeExpenseReportController extends Controller
     {
         /*
         |--------------------------------------------------------------------------
+        | Dropdown Data
+        |--------------------------------------------------------------------------
+        */
+
+        $paymentMethods = PaymentMethod::orderBy('name')->get();
+
+        $cashiers = Cashier::orderBy('name')->get();
+
+        $funds = Fund::orderBy('name')->get();
+
+        /*
+        |--------------------------------------------------------------------------
+        | Filter Values
+        |--------------------------------------------------------------------------
+        */
+
+        $filters = $request->all();
+
+        /*
+        |--------------------------------------------------------------------------
         | Start Query
         |--------------------------------------------------------------------------
         */
 
         $query = Transaction::with([
+            'fund',
             'paymentMethod',
             'cashier',
             'items'
         ]);
+
+        /*
+        |--------------------------------------------------------------------------
+        | Report Type
+        |--------------------------------------------------------------------------
+        */
+
+        if ($request->report_type == 'income') {
+
+            $query->where('type', 'income');
+
+        } elseif ($request->report_type == 'expense') {
+
+            $query->where('type', 'expense');
+
+        }
+        // income_expense হলে কোনো where লাগবে না
 
         /*
         |--------------------------------------------------------------------------
@@ -29,12 +70,6 @@ class IncomeExpenseReportController extends Controller
         */
 
         if ($request->filter_mode == 'voucher') {
-
-            /*
-            |--------------------------------------------------------------------------
-            | Voucher Filter
-            |--------------------------------------------------------------------------
-            */
 
             if ($request->filled('voucher_no')) {
 
@@ -45,12 +80,6 @@ class IncomeExpenseReportController extends Controller
             }
 
         } else {
-
-            /*
-            |--------------------------------------------------------------------------
-            | Date Filter
-            |--------------------------------------------------------------------------
-            */
 
             if ($request->filled('date_from')) {
 
@@ -73,17 +102,70 @@ class IncomeExpenseReportController extends Controller
 
         /*
         |--------------------------------------------------------------------------
-        | Report Type
+        | Payment Method Filter
         |--------------------------------------------------------------------------
         */
 
-        if ($request->report_type == 'income') {
+        if ($request->filled('payment_method_id')) {
 
-            $query->where('type', 'income');
+            $query->where(
+                'payment_method_id',
+                $request->payment_method_id
+            );
+        }
 
-        } elseif ($request->report_type == 'expense') {
+        /*
+        |--------------------------------------------------------------------------
+        | Cashier Filter
+        |--------------------------------------------------------------------------
+        */
 
-            $query->where('type', 'expense');
+        if ($request->filled('cashier_id')) {
+
+            $query->where(
+                'cashier_id',
+                $request->cashier_id
+            );
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Fund Filter
+        |--------------------------------------------------------------------------
+        */
+
+        if ($request->filled('fund_id')) {
+
+            $query->where(
+                'fund_id',
+                $request->fund_id
+            );
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Sorting
+        |--------------------------------------------------------------------------
+        */
+
+        switch ($request->sort_by) {
+
+            case 'oldest':
+                $query->orderBy('date', 'asc');
+                break;
+
+            case 'highest':
+                $query->orderBy('total_amount', 'desc');
+                break;
+
+            case 'lowest':
+                $query->orderBy('total_amount', 'asc');
+                break;
+
+            default:
+                $query->orderBy('date', 'desc')
+                      ->orderBy('id', 'desc');
+                break;
         }
 
         /*
@@ -92,9 +174,7 @@ class IncomeExpenseReportController extends Controller
         |--------------------------------------------------------------------------
         */
 
-        $reports = $query
-            ->latest()
-            ->get();
+        $reports = $query->get();
 
         /*
         |--------------------------------------------------------------------------
@@ -112,20 +192,26 @@ class IncomeExpenseReportController extends Controller
 
         $balance = $totalIncome - $totalExpense;
 
+        $totalVoucher = $reports->count();
+
         /*
         |--------------------------------------------------------------------------
         | Return View
         |--------------------------------------------------------------------------
         */
-        $filters = $request->all();
-        
+
         return view(
             'admin.income-expense-report.index',
             compact(
                 'reports',
+                'filters',
+                'paymentMethods',
+                'cashiers',
+                'funds',
                 'totalIncome',
                 'totalExpense',
-                'balance'
+                'balance',
+                'totalVoucher'
             )
         );
     }

@@ -11,14 +11,14 @@ use App\Models\PaymentMethod;
 use App\Models\FeeCollection;
 use App\Models\Madrasa;
 use App\Exports\FeeReportExport;
-use Barryvdh\DomPDF\Facade\Pdf;
 use Maatwebsite\Excel\Facades\Excel;
+use Mpdf\Mpdf;
+use Mpdf\Config\ConfigVariables;
+use Mpdf\Config\FontVariables;
 
 class FeeReportController extends Controller
 {
-    /**
-     * Web View — ফিল্টার ফর্ম + প্রিভিউ
-     */
+
     public function index(Request $request)
     {
         $dropdowns = $this->dropdownData();
@@ -34,9 +34,6 @@ class FeeReportController extends Controller
         return view('admin.fee-report.index', array_merge($dropdowns, $data));
     }
 
-    /**
-     * আলাদা ট্যাবে ক্লিন প্রিন্ট ভিউ
-     */
     public function print(Request $request)
     {
         $data = $this->buildReportData($request);
@@ -44,21 +41,47 @@ class FeeReportController extends Controller
         return view('admin.fee-report.print', $data);
     }
 
-    /**
-     * PDF Download — একই report-content.blade.php ব্যবহার করে
-     */
+
     public function pdf(Request $request)
     {
         $data = $this->buildReportData($request);
 
-        $pdf = Pdf::loadView('admin.fee-report.partials.report', $data)
-            ->setPaper('a4', 'portrait');
+        $html = view('admin.fee-report.partials.report', $data)->render();
 
-        return $pdf->download('fee-report-'.now()->format('Y-m-d').'.pdf');
+        $defaultConfig = (new ConfigVariables())->getDefaults();
+        $fontDirs = $defaultConfig['fontDir'];
+
+        $defaultFontConfig = (new FontVariables())->getDefaults();
+        $fontData = $defaultFontConfig['fontdata'];
+
+        $mpdf = new Mpdf([
+            'mode'          => 'utf-8',
+            'format'        => 'A4',
+            'orientation'   => 'P',
+            'margin_top'    => 12,
+            'margin_bottom' => 12,
+            'margin_left'   => 12,
+            'margin_right'  => 12,
+            // resources/fonts ফোল্ডার থেকে বাংলা ফন্ট খুঁজে নেবে
+            'fontDir' => array_merge($fontDirs, [resource_path('fonts')]),
+            'fontdata' => $fontData + [
+                'notosansbengali' => [
+                    'R' => 'NotoSansBengali-Regular.ttf',
+                    'B' => 'NotoSansBengali-Bold.ttf',
+                ],
+            ],
+            'default_font' => 'notosansbengali',
+        ]);
+
+        $mpdf->WriteHTML($html);
+
+        return response(
+            $mpdf->Output('fee-report-'.now()->format('Y-m-d').'.pdf', 'S')
+        )->header('Content-Type', 'application/pdf');
     }
 
     /**
-     * Excel Download — একই report-content.blade.php ব্যবহার করে
+     * Excel Download — একই partials/report.blade.php ব্যবহার করে
      */
     public function excel(Request $request)
     {
@@ -87,20 +110,21 @@ class FeeReportController extends Controller
                 'user'           => 'ব্যবহারকারী ভিত্তিক পেমেন্ট তালিকা',
                 'class'          => 'ক্লাস ভিত্তিক পেমেন্ট তালিকা',
                 'payment_method' => 'পেমেন্ট মাধ্যম ভিত্তিক তালিকা',
+                'receipt'        => 'রশিদ ভিত্তিক পেমেন্ট তালিকা',
             ],
         ];
     }
 
     /*
     |--------------------------------------------------------------------------
-    | মূল Query + Summary — index/print/pdf/excel সবাই এখান থেকেই ডেটা নেয়
+    | Query + Summary — index/print/pdf/excel সবাই এখান থেকেই ডেটা নেয়
     |--------------------------------------------------------------------------
     */
     private function buildReportData(Request $request): array
     {
         $academicYears  = AcademicYear::orderByDesc('id')->get();
         $cashiers       = Cashier::orderBy('name')->get();
-        $classes = Classes::orderBy('name')->get();
+        $classes        = Classes::orderBy('name')->get();
         $paymentMethods = PaymentMethod::orderBy('name')->get();
 
         $query = FeeCollection::with([
@@ -130,6 +154,11 @@ class FeeReportController extends Controller
             $query->where('payment_method_id', $request->filter_id);
         }
 
+        // রশিদ নং ভিত্তিক (আংশিক মিল দিয়ে সার্চ)
+        if ($request->report_type == 'receipt' && $request->filled('filter_id')) {
+            $query->where('receipt_no', 'like', '%'.$request->filter_id.'%');
+        }
+
         if ($request->filled('from_date')) {
             $query->whereDate('collection_date', '>=', $request->from_date);
         }
@@ -147,15 +176,13 @@ class FeeReportController extends Controller
         $totalDiscount = $reports->sum('discount');
         $totalPaid     = $reports->sum('paid_amount');
         $totalDue      = $reports->sum('due_amount');
-
-        // নোটঃ previous_paid কলামটি বর্তমান FeeCollection মডেলে নেই ধরে নেওয়া হয়েছে।
-        // থাকলে নিচের লাইনটি স্বয়ংক্রিয়ভাবে কাজ করবে, না থাকলে সবসময় ০ দেখাবে।
         $totalPrevious = $reports->sum('previous_paid');
 
         $reportTitle = match ($request->report_type) {
             'user'           => 'ব্যবহারকারী ভিত্তিক পেমেন্ট তালিকা',
             'class'          => 'ক্লাস ভিত্তিক পেমেন্ট তালিকা',
             'payment_method' => 'পেমেন্ট মাধ্যম ভিত্তিক তালিকা',
+            'receipt'        => 'রশিদ ভিত্তিক পেমেন্ট তালিকা',
             default          => 'ফি রিপোর্ট',
         };
 
@@ -171,6 +198,10 @@ class FeeReportController extends Controller
 
         if ($request->report_type == 'payment_method') {
             $filterName = optional($paymentMethods->firstWhere('id', $request->filter_id))->name;
+        }
+
+        if ($request->report_type == 'receipt') {
+            $filterName = $request->filter_id;
         }
 
         $selectedYear = optional(

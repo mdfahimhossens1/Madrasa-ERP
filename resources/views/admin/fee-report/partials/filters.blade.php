@@ -57,8 +57,8 @@
 
             </div>
 
-            {{-- Dynamic Filter --}}
-            <div class="mb-3">
+            {{-- Dynamic Filter: Select (user / class / payment_method) --}}
+            <div class="mb-3" id="filter_select_wrapper">
 
                 <label
                     class="form-label fw-bold"
@@ -71,10 +71,46 @@
                 <select
                     name="filter_id"
                     id="filter_id"
-                    class="form-select"
-                    required>
+                    class="form-select">
 
                 </select>
+
+            </div>
+
+            {{-- Dynamic Filter: Text Input (receipt) — শুধু "রশিদ ভিত্তিক" নির্বাচন করলে দেখাবে --}}
+            <div class="mb-3 d-none" id="filter_text_wrapper">
+
+                <label class="form-label fw-bold">রশিদ নং :</label>
+
+                <input
+                    type="text"
+                    id="filter_id_text"
+                    class="form-control"
+                    placeholder="রশিদ নং লিখুন"
+                    value="{{ ($filters['report_type'] ?? '') == 'receipt' ? ($filters['filter_id'] ?? '') : '' }}">
+
+            </div>
+
+            {{-- Date Range: হতে / পর্যন্ত --}}
+            <div class="row mb-3">
+
+                <div class="col-6">
+                    <label class="form-label fw-bold text-primary">হতে</label>
+                    <input
+                        type="date"
+                        name="from_date"
+                        class="form-control"
+                        value="{{ $filters['from_date'] ?? '' }}">
+                </div>
+
+                <div class="col-6">
+                    <label class="form-label fw-bold text-primary">পর্যন্ত</label>
+                    <input
+                        type="date"
+                        name="to_date"
+                        class="form-control"
+                        value="{{ $filters['to_date'] ?? '' }}">
+                </div>
 
             </div>
 
@@ -112,10 +148,30 @@ const methods = @json($paymentMethods->map(fn($m) => [
 ]));
 
 const selectedFilter = "{{ $filters['filter_id'] ?? '' }}";
+const currentReportType = "{{ $filters['report_type'] ?? '' }}";
 
 function loadFilter() {
 
     let type = $('#report_type').val();
+
+    // "রশিদ ভিত্তিক" নির্বাচন করলে select লুকিয়ে টেক্সট ইনপুট দেখাবে
+    if (type === 'receipt') {
+
+        $('#filter_select_wrapper').addClass('d-none');
+        $('#filter_id').prop('disabled', true).removeAttr('name');
+
+        $('#filter_text_wrapper').removeClass('d-none');
+        $('#filter_id_text').attr('name', 'filter_id').prop('disabled', false);
+
+        return;
+    }
+
+    // অন্য যেকোনো টাইপের জন্য select ফিরিয়ে আনা, টেক্সট ইনপুট বন্ধ
+    $('#filter_text_wrapper').addClass('d-none');
+    $('#filter_id_text').prop('disabled', true).removeAttr('name');
+
+    $('#filter_select_wrapper').removeClass('d-none');
+    $('#filter_id').attr('name', 'filter_id').prop('disabled', false);
 
     let data = [];
     let label = "নির্বাচন করুন";
@@ -162,6 +218,7 @@ $(document).ready(function () {
     $('#report_type').on('change', function () {
 
         $('#filter_id').val('');
+        $('#filter_id_text').val('');
 
         loadFilter();
 

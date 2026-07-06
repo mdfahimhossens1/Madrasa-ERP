@@ -93,9 +93,11 @@
 {{-- Action Buttons: Print / PDF / Excel — তিনটাই এই একই ভিউ থেকে জেনারেট হয় --}}
 <div class="d-flex justify-content-end gap-2 mb-3 no-print">
 
-    <button type="button" onclick="window.print();" class="btn btn-outline-secondary btn-sm">
+    <a href="{{ route('dashboard.fee-report.print', request()->query()) }}"
+       target="_blank"
+       class="btn btn-outline-secondary btn-sm">
         <i class="fas fa-print"></i> Print
-    </button>
+    </a>
 
     <a href="{{ route('dashboard.fee-report.pdf', request()->query()) }}"
        target="_blank"

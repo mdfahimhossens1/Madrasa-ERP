@@ -25,6 +25,7 @@ use App\Http\Controllers\Admin\NotificationController;
 use App\Http\Controllers\Admin\SettingController;
 use App\Http\Controllers\Admin\FeeTypeController;
 use App\Http\Controllers\Admin\StudentFeeCollectionController;
+use App\Http\Controllers\Admin\FeeReportController;
 
 Route::get('/', function () {
     return view('welcome');
@@ -180,6 +181,7 @@ Route::middleware(['role:super_admin,soft_admin,madrasa_admin'])
 
     Route::patch('admissions/{id}/toggle-status', [AdmissionController::class, 'toggleStatus'])
         ->name('dashboard.admissions.toggle-status');
+    
 });
     Route::middleware(['role:super_admin,soft_admin,madrasa_admin'])->prefix('dashboard')->group(function(){
     // 🏫 Institution Routes
@@ -256,6 +258,12 @@ Route::middleware(['role:super_admin,soft_admin,madrasa_admin'])
     Route::post('/transactions/store', [TransactionController::class, 'store'])->name('dashboard.transactions.store');
     Route::delete('/transactions/{id}', [TransactionController::class, 'destroy'])->name('dashboard.transactions.destroy');
     Route::get('/reports/income-expense',[IncomeExpenseReportController::class, 'incomeExpense'])->name('dashboard.reports.income-expense');
+Route::get('/fee-report', [FeeReportController::class, 'index'])
+    ->name('dashboard.fee-report.index');
+     Route::get('fee-report', [FeeReportController::class, 'index'])->name('dashboard.fee-report.index');
+    Route::get('fee-report/print', [FeeReportController::class, 'print'])->name('dashboard.fee-report.print');
+    Route::get('fee-report/pdf', [FeeReportController::class, 'pdf'])->name('dashboard.fee-report.pdf');
+    Route::get('fee-report/excel', [FeeReportController::class, 'excel'])->name('dashboard.fee-report.excel');
     Route::post('/ledger/store', [LedgerController::class, 'store'])->name('dashboard.ledger.store');
     Route::post('/sub-ledger/store', [SubLedgerController::class, 'store'])->name('dashboard.sub-ledger.store');
     Route::get('/sub-ledger/{id}', [SubLedgerController::class, 'getByLedger'])->name('dashboard.ledger.index');

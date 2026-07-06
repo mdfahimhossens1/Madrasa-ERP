@@ -416,7 +416,7 @@ body{ background: var(--bg); color: var(--text); }
                 <li><a class="nav-link text-white-50" href="{{route('dashboard.fee-settings.index')}}" data-submenu="account">ফি সেটিং</a></li>
                 <li><a class="nav-link text-white-50" href="{{route('dashboard.fee-collection.index')}}" data-submenu="account">ফি গ্রহণ</a></li>
                 <li><a class="nav-link text-white-50" href="#" data-submenu="account">অনুদান</a></li>
-                <li><a class="nav-link text-white-50" href="#" data-submenu="account">ফি রিপোর্ট</a></li>
+                <li><a href="{{ route('dashboard.fee-report.index') }}" class="nav-link text-white-50">ফি রিপোর্ট</li>
                 <li><a class="nav-link text-white-50" href="#" data-submenu="account">বকেয়া</a></li>
                 <li><a class="nav-link text-white-50" href="#" data-submenu="account">হিস্ট্রি</a></li>
             </ul>

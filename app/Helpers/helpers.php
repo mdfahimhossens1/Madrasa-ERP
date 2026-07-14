@@ -1,10 +1,15 @@
 <?php
 
+/*
+|--------------------------------------------------------------------------
+| Bangla Number
+|--------------------------------------------------------------------------
+*/
+
 if (! function_exists('bn_num')) {
 
     /**
-     * ইংরেজি সংখ্যা/টেক্সটকে বাংলা সংখ্যায় কনভার্ট করে।
-     * Example: bn_num(1250.00) => '১,২৫০.০০'
+     * Convert English numbers to Bangla numbers.
      */
     function bn_num($value)
     {
@@ -15,10 +20,16 @@ if (! function_exists('bn_num')) {
     }
 }
 
+/*
+|--------------------------------------------------------------------------
+| Bangla Date
+|--------------------------------------------------------------------------
+*/
+
 if (! function_exists('bn_date')) {
 
     /**
-     * Carbon date কে d-m-Y ফরম্যাটে বাংলা সংখ্যায় দেখায়।
+     * Format Carbon date to Bangla.
      */
     function bn_date($date, $format = 'd-m-Y')
     {
@@ -27,5 +38,46 @@ if (! function_exists('bn_date')) {
         }
 
         return bn_num($date->format($format));
+    }
+}
+
+/*
+|--------------------------------------------------------------------------
+| Permission Helpers
+|--------------------------------------------------------------------------
+*/
+
+if (! function_exists('can_access')) {
+
+    /**
+     * Check if authenticated user has a permission.
+     */
+    function can_access(string $permission): bool
+    {
+        return auth()->check()
+            && auth()->user()->hasPermission($permission);
+    }
+}
+
+if (! function_exists('cannot_access')) {
+
+    /**
+     * Opposite of can_access().
+     */
+    function cannot_access(string $permission): bool
+    {
+        return ! can_access($permission);
+    }
+}
+
+if (! function_exists('has_role')) {
+
+    /**
+     * Check if authenticated user has a role.
+     */
+    function has_role(string $role): bool
+    {
+        return auth()->check()
+            && auth()->user()->hasRole($role);
     }
 }

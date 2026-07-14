@@ -14,7 +14,7 @@ return new class extends Migration
         Schema::create('sub_ledgers', function (Blueprint $table) {
             $table->id();
             $table->foreignId('ledger_id')->constrained()->cascadeOnDelete();
-            $table->unsignedBigInteger('madrasa_id');
+            $table->unsignedBigInteger('institution_id');
             $table->enum('fee_type', ['one_time', 'monthly', 'yearly'])
                 ->nullable();
             $table->string('name');

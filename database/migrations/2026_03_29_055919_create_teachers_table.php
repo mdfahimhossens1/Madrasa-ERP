@@ -11,7 +11,7 @@ return new class extends Migration
         Schema::create('teachers', function (Blueprint $table) {
             $table->id();
             $table->unsignedBigInteger('user_id');
-            $table->unsignedBigInteger('madrasa_id');
+            $table->unsignedBigInteger('institution_id');
             $table->string('teacher_id', 50);
             $table->string('designation', 100);
             $table->date('joining_date');
@@ -25,9 +25,9 @@ return new class extends Migration
             $table->text('remarks')->nullable();
             $table->timestamps();
             
-            $table->unique(['teacher_id', 'madrasa_id']);
+            $table->unique(['teacher_id', 'institution_id']);
             
-            $table->index('madrasa_id');
+            $table->index('institution_id');
             $table->index('teacher_id');
             $table->index('joining_date');
         });
@@ -37,7 +37,7 @@ return new class extends Migration
     {
         Schema::table('teachers', function (Blueprint $table) {
             $table->foreign('user_id')->references('id')->on('users')->onDelete('cascade');
-            $table->foreign('madrasa_id')->references('id')->on('madrasas')->onDelete('cascade');
+            $table->foreign('institution_id')->references('id')->on('madrasas')->onDelete('cascade');
             $table->foreign('class_teacher_for')->references('id')->on('classes')->onDelete('set null');
         });
     }

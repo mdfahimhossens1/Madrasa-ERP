@@ -3,10 +3,13 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use App\Models\Traits\BelongsToInstitution;
 
 class Cashier extends Model
 {
-    protected $fillable = ['name', 'madrasa_id'];
+    use BelongsToInstitution;
+    
+    protected $fillable = ['name', 'institution_id'];
 
     public function user()
     {

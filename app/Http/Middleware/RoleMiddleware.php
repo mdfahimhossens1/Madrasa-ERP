@@ -6,75 +6,53 @@ use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Illuminate\Support\Facades\Auth;
+use App\Models\Role;
 
 class RoleMiddleware
 {
-    /**
-     * Normalize role slug
-     * Example:
-     * super-admin => super_admin
-     */
-    private function normalize(?string $role): string
-    {
-        $role = strtolower(trim($role ?? 'user'));
-
-        return str_replace([' ', '-'], '_', $role);
-    }
-
     public function handle(Request $request, Closure $next, ...$roles): Response
     {
-        $user = Auth::user();
-
-        // User logged in?
-        if (!$user) {
+        // Login Check
+        if (!Auth::check()) {
             return redirect()->route('login');
         }
 
-        // Get user role slug
-        $dbRole = optional($user->role)->slug ?? 'user';
+        $user = Auth::user();
 
-        $roleName = $this->normalize($dbRole);
+        // User Role
+        $userRole = $user->role;
 
-        /*
-        |--------------------------------------------------------------------------
-        | Role Hierarchy
-        |--------------------------------------------------------------------------
-        | Higher number = higher power
-        */
-
-        $levels = [
-
-            'guardian'       => 1,
-            'student'        => 2,
-            'teacher'        => 3,
-
-            'madrasa_admin' => 4,
-
-            'soft_admin'    => 5,
-
-            'super_admin'   => 6,
-        ];
-
-        $userLevel = $levels[$roleName] ?? 0;
-
-        /*
-        |--------------------------------------------------------------------------
-        | Check Required Roles
-        |--------------------------------------------------------------------------
-        */
-
-        foreach ($roles as $role) {
-
-            $requiredRole = $this->normalize($role);
-
-            $requiredLevel = $levels[$requiredRole] ?? 0;
-
-            // User has required role or higher
-            if ($userLevel >= $requiredLevel) {
-                return $next($request);
-            }
+        if (!$userRole) {
+            abort(403, 'Role not assigned.');
         }
 
-        abort(403, 'Unauthorized Access.');
+        /*
+        |--------------------------------------------------------------------------
+        | Exact Role Match
+        |--------------------------------------------------------------------------
+        */
+        if (in_array($userRole->slug, $roles)) {
+            return $next($request);
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Role Hierarchy Check
+        |--------------------------------------------------------------------------
+        */
+
+        $requiredRoles = Role::whereIn('slug', $roles)->get();
+
+        if ($requiredRoles->isEmpty()) {
+            abort(403, 'Invalid role configuration.');
+        }
+
+        $minimumLevel = $requiredRoles->max('level');
+
+        if ($userRole->level >= $minimumLevel) {
+            return $next($request);
+        }
+
+        abort(403, 'You do not have permission to access this page.');
     }
 }

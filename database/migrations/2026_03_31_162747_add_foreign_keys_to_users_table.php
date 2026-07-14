@@ -11,13 +11,13 @@ return new class extends Migration
         // প্রথমে sections টেবিলের foreign keys (এটা আগে করতে হবে)
         Schema::table('sections', function (Blueprint $table) {
             $table->foreign('class_id')->references('id')->on('classes')->onDelete('cascade');
-            $table->foreign('madrasa_id')->references('id')->on('madrasas')->onDelete('cascade');
+            $table->foreign('institution_id')->references('id')->on('madrasas')->onDelete('cascade');
         });
         
         // তারপর students টেবিলের foreign keys
         Schema::table('students', function (Blueprint $table) {
             $table->foreign('user_id')->references('id')->on('users')->onDelete('cascade');
-            $table->foreign('madrasa_id')->references('id')->on('madrasas')->onDelete('cascade');
+            $table->foreign('institution_id')->references('id')->on('madrasas')->onDelete('cascade');
             $table->foreign('academic_year_id')->references('id')->on('academic_years');
             $table->foreign('section_id')->references('id')->on('sections')->onDelete('set null');
             $table->foreign('guardian_user_id')->references('id')->on('users')->onDelete('set null');
@@ -26,7 +26,7 @@ return new class extends Migration
         // সবশেষে users টেবিলের foreign keys
         Schema::table('users', function (Blueprint $table) {
             $table->foreign('role_id')->references('id')->on('roles')->onDelete('restrict');
-            $table->foreign('madrasa_id')->references('id')->on('madrasas')->onDelete('cascade');
+            $table->foreign('institution_id')->references('id')->on('madrasas')->onDelete('cascade');
             $table->foreign('present_division_id')->references('id')->on('divisions')->onDelete('set null');
             $table->foreign('present_district_id')->references('id')->on('districts')->onDelete('set null');
             $table->foreign('present_upazila_id')->references('id')->on('upazilas')->onDelete('set null');
@@ -46,7 +46,7 @@ return new class extends Migration
         // Users টেবিলের foreign keys ড্রপ
         Schema::table('users', function (Blueprint $table) {
             $table->dropForeign(['role_id']);
-            $table->dropForeign(['madrasa_id']);
+            $table->dropForeign(['institution_id']);
             $table->dropForeign(['present_division_id']);
             $table->dropForeign(['present_district_id']);
             $table->dropForeign(['present_upazila_id']);
@@ -60,7 +60,7 @@ return new class extends Migration
         // Students টেবিলের foreign keys ড্রপ
         Schema::table('students', function (Blueprint $table) {
             $table->dropForeign(['user_id']);
-            $table->dropForeign(['madrasa_id']);
+            $table->dropForeign(['institution_id']);
             $table->dropForeign(['academic_year_id']);
             $table->dropForeign(['section_id']);
             $table->dropForeign(['guardian_user_id']);
@@ -69,7 +69,7 @@ return new class extends Migration
         // Sections টেবিলের foreign keys ড্রপ
         Schema::table('sections', function (Blueprint $table) {
             $table->dropForeign(['class_id']);
-            $table->dropForeign(['madrasa_id']);
+            $table->dropForeign(['institution_id']);
         });
 
     }

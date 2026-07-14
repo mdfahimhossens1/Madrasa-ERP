@@ -13,10 +13,10 @@ class FeeCollectionController extends Controller
 {
     public function index(Request $request)
     {
-        $madrasaId = auth()->user()->madrasa_id ?? 1;
+        $institutionId = auth()->user()->$institution_id ?? 1;
 
         $collections = FeeCollection::with(['student.user', 'collector', 'paymentMethod'])
-            ->where('madrasa_id', $madrasaId)
+            ->where('institution_id', $institutionId)
             ->when($request->student_id, fn($q) => $q->where('student_id', $request->student_id))
             ->when($request->status,     fn($q) => $q->where('status', $request->status))
             ->latest()
@@ -26,16 +26,16 @@ class FeeCollectionController extends Controller
         $years          = AcademicYear::where('status', 1)->get();
         $cashiers       = User::where('role_id', 4)->get();
 
-        $todayTotal = FeeCollection::where('madrasa_id', $madrasaId)
+        $todayTotal = FeeCollection::where('institution_id', $institutionId)
             ->whereDate('created_at', today())->sum('paid_amount');
 
-        $myTotal = FeeCollection::where('madrasa_id', $madrasaId)
+        $myTotal = FeeCollection::where('institution_id', $institutionId)
             ->whereDate('created_at', today())
             ->where('collected_by', auth()->id())
             ->sum('paid_amount');
 
         $payments = FeeCollection::with(['student.user', 'collector'])
-            ->where('madrasa_id', $madrasaId)
+            ->where('institution_id', $institutionId)
             ->whereDate('created_at', today())
             ->latest()->get()
             ->map(fn($item) => (object)[

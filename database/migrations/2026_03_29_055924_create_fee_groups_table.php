@@ -13,7 +13,7 @@ return new class extends Migration
     {
     Schema::create('fee_groups', function (Blueprint $table) {
             $table->id();
-            $table->unsignedBigInteger('madrasa_id');
+            $table->unsignedBigInteger('institution_id');
             $table->unsignedBigInteger('fund_id');
             $table->unsignedBigInteger('ledger_id');
             $table->unsignedBigInteger('sub_ledger_id')->nullable();
@@ -26,7 +26,7 @@ return new class extends Migration
             $table->bigInteger('number')->number()->unique();
             $table->timestamps();
 
-            $table->index('madrasa_id');
+            $table->index('institution_id');
             $table->index('fund_id');
             $table->index('ledger_id');
             $table->index('sub_ledger_id');

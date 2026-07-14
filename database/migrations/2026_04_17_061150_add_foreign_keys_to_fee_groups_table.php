@@ -9,7 +9,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('fee_groups', function (Blueprint $table) {
-            $table->foreign('madrasa_id')
+            $table->foreign('institution_id')
                   ->references('id')
                   ->on('madrasas')
                   ->onDelete('cascade');
@@ -40,7 +40,7 @@ return new class extends Migration
     public function down(): void
     {
         Schema::table('fee_groups', function (Blueprint $table) {
-            $table->dropForeign(['madrasa_id']);
+            $table->dropForeign(['institution_id']);
             $table->dropForeign(['fund_id']);
             $table->dropForeign(['ledger_id']);
             $table->dropForeign(['sub_ledger_id']);

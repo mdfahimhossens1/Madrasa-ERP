@@ -13,14 +13,14 @@ return new class extends Migration
     {
         Schema::create('exams', function (Blueprint $table) {
         $table->id();
-        $table->unsignedBigInteger('madrasa_id');
+        $table->unsignedBigInteger('institution_id');
         $table->string('name');
         $table->decimal('fee', 10, 2)->default(0);
         $table->date('start_date');
         $table->date('end_date');
         $table->timestamps();
 
-        $table->foreign('madrasa_id')->references('id')->on('madrasas')->onDelete('cascade');
+        $table->foreign('institution_id')->references('id')->on('madrasas')->onDelete('cascade');
         });
     }
 

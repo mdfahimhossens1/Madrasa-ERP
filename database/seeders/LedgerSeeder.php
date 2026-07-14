@@ -43,7 +43,7 @@ class LedgerSeeder extends Seeder
                 ],
 
                 [
-                    'madrasa_id' => 1,
+                    'institution_id' => 1,
                     'user_id'    => 1,
                     'type'       => $ledger['type'],
                 ]

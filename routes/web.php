@@ -32,26 +32,11 @@ Route::get('/', function () {
 });
 
 // লগইন করার পর ড্যাশবোর্ড রিডাইরেক্ট
-Route::middleware(['auth'])->group(function () {
-    Route::get('/dashboard', function () {
-        $user = auth()->user();
-        
-        if ($user->is_super_admin) {
-            return redirect()->route('super-admin.dashboard');
-        } elseif ($user->is_soft_admin) {
-            return redirect()->route('soft-admin.dashboard');
-        } elseif ($user->is_madrasa_admin) {
-            return redirect()->route('madrasa-admin.dashboard');
-        } elseif ($user->is_teacher) {
-            return redirect()->route('teacher.dashboard');
-        } elseif ($user->is_student) {
-            return redirect()->route('student.dashboard');
-        } elseif ($user->is_guardian) {
-            return redirect()->route('guardian.dashboard');
-        }
-        
-        return redirect('/');
-    })->name('dashboard');
+Route::middleware(['auth', 'institution'])->group(function () {
+
+    Route::get('/dashboard', [AdminDashboardController::class, 'index'])
+        ->name('dashboard');
+
 });
 
 // ============ Location AJAX Routes (Auth ছাড়া) ============
@@ -59,44 +44,8 @@ Route::get('get-districts/{divisionId}', [UserController::class, 'getDistricts']
 Route::get('get-upazilas/{districtId}', [UserController::class, 'getUpazilas'])->name('get.upazilas');
 
 // ============ সুপার অ্যাডমিন এবং অ্যাডমিন এর জন্য ড্যাশবোর্ড রুটস ============
-Route::middleware(['auth'])->group(function () {
+Route::middleware(['auth', 'institution'])->group(function () {
     
-    // ✅ সুপার অ্যাডমিন ড্যাশবোর্ড
-    Route::middleware(['role:super_admin'])->group(function () {
-        Route::get('/super-admin/dashboard', [AdminDashboardController::class, 'index'])->name('super-admin.dashboard');
-    });
-    
-    // ✅ সফট অ্যাডমিন ড্যাশবোর্ড
-    Route::middleware(['role:soft_admin'])->group(function () {
-        Route::get('/soft-admin/dashboard', [AdminDashboardController::class, 'index'])->name('soft-admin.dashboard');
-    });
-    
-    // ✅ মাদ্রাসা অ্যাডমিন ড্যাশবোর্ড
-    Route::middleware(['role:madrasa_admin'])->group(function () {
-        Route::get('/madrasa-admin/dashboard', [AdminDashboardController::class, 'index'])->name('madrasa-admin.dashboard');
-    });
-    
-    // ✅ শিক্ষক ড্যাশবোর্ড
-    Route::middleware(['role:teacher'])->group(function () {
-        Route::get('/teacher/dashboard', function () {
-            return view('teacher.dashboard');
-        })->name('teacher.dashboard');
-    });
-    
-    // ✅ শিক্ষার্থী ড্যাশবোর্ড
-    Route::middleware(['role:student'])->group(function () {
-        Route::get('/student/dashboard', function () {
-            return view('student.dashboard');
-        })->name('student.dashboard');
-    });
-    
-    // ✅ অভিভাবক ড্যাশবোর্ড
-    Route::middleware(['role:guardian'])->group(function () {
-        Route::get('/guardian/dashboard', function () {
-            return view('guardian.dashboard');
-        })->name('guardian.dashboard');
-    });
-
     // ✅ Common (All Auth Users)
     Route::middleware(['role:admin,super_admin,soft_admin,madrasa_admin,teacher,student,guardian'])->group(function () {
         Route::get('dashboard/profile', [ProfileController::class, 'adminProfile'])->name('dashboard.profile');

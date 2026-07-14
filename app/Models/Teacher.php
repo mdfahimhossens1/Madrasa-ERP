@@ -4,14 +4,14 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-
+use App\Models\Traits\BelongsToInstitution;
 class Teacher extends Model
 {
-    use HasFactory;
+    use HasFactory, BelongsToInstitution;
 
     protected $fillable = [
         'user_id',
-        'madrasa_id',
+        'institution_id',
         'teacher_id',
         'designation',
         'joining_date',

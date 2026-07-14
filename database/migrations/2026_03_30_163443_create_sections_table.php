@@ -13,7 +13,7 @@ return new class extends Migration
             $table->string('name');
             $table->string('name_bn')->nullable();
             $table->unsignedBigInteger('class_id');
-            $table->unsignedBigInteger('madrasa_id')->nullable();
+            $table->unsignedBigInteger('institution_id')->nullable();
             $table->boolean('is_active')->default(true);
             $table->unsignedBigInteger('created_by')->nullable();  
             $table->unsignedBigInteger('updated_by')->nullable();

@@ -208,11 +208,7 @@ body{ background: var(--bg); color: var(--text); }
 <body>
 @php
   $authUser = Auth::user();
-  $roles = App\Models\Role::all();
-  $role = strtolower(optional(Auth::user()->role)->role_name ?? 'user');
-  $isSuperAdmin   = $role === 'super_admin';
-  $isAdmin   = $role === 'admin';
-  $isManager = $role === 'manager';
+  $role = optional($authUser->role)->slug;
   $routeName = request()->route()?->getName() ?? '';
 
   $active = fn($name) => $routeName === $name ? 'active' : '';
@@ -236,13 +232,13 @@ body{ background: var(--bg); color: var(--text); }
           </a>
           </div>
             @php
-                $madrasaName = auth()->user()->madrasa->name_bn ?? '';
+                $institutionName = optional(auth()->user()->institution)->name ?? 'System';
 
-                $words = explode(' ', $madrasaName);
+            $words = explode(' ', $institutionName);
 
-                $firstPart = implode(' ', array_slice($words, 0, 1));
+            $firstPart = implode(' ', array_slice($words,0,1));
 
-                $secondPart = implode(' ', array_slice($words, 1));
+            $secondPart = implode(' ', array_slice($words,1));
             @endphp
 
             <div class="content text-secondary small mt-1">
@@ -493,7 +489,7 @@ body{ background: var(--bg); color: var(--text); }
           <i class="fas fa-bars"></i>
         </button>
         @php
-    $defaultTitle = auth()->user()->madrasa->name_bn ?? 'মাদ্রাসা';
+    $defaultTitle = optional(auth()->user()->institution)->name ?? 'Dashboard';
     $pageTitle = trim($__env->yieldContent('title'));
     $finalTitle = $pageTitle ?: $defaultTitle;
       @endphp
@@ -547,7 +543,9 @@ body{ background: var(--bg); color: var(--text); }
 
     <span class="user-meta d-none d-md-block">
       <span class="name">{{ $authUser->name ?? 'User' }}</span><br>
-      <span class="role">{{ ucfirst($role) }}</span>
+      <span class="role">
+    {{ optional($authUser->role)->role_name }}
+</span>
     </span>
 
     <i class="fas fa-chevron-down text-muted ms-1"></i>

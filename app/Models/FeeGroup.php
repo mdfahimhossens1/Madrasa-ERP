@@ -4,13 +4,13 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-
+use App\Models\Traits\BelongsToInstitution;
 class FeeGroup extends Model
 {
-    use HasFactory;
+    use HasFactory, BelongsToInstitution;
 
     protected $fillable = [
-        'madrasa_id',
+        'institution_id',
         'fund_id',
         'ledger_id',
         'sub_ledger_id',

@@ -13,7 +13,7 @@ return new class extends Migration
     {
         Schema::create('cashiers', function (Blueprint $table) {
             $table->id();
-            $table->unsignedBigInteger('madrasa_id')->nullable();
+            $table->unsignedBigInteger('institution_id')->nullable();
             $table->string('name');
             $table->timestamps();
         });

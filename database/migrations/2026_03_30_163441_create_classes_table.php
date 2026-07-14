@@ -10,7 +10,7 @@ return new class extends Migration
     {
         Schema::create('classes', function (Blueprint $table) {
             $table->id();
-            $table->unsignedBigInteger('madrasa_id')->nullable();
+            $table->unsignedBigInteger('institution_id')->nullable();
             $table->string('name', 100);
             $table->string('name_bn', 100)->nullable();
             $table->string('level', 50)->nullable();

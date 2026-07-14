@@ -23,6 +23,8 @@ class DatabaseSeeder extends Seeder
             FundSeeder::class,
             LedgerSeeder::class,
             SubLedgerSeeder::class,
+            PermissionSeeder::class,
+            RolePermissionSeeder::class
         ]);
         // User::factory()->create([
         //     'name' => 'Test User',

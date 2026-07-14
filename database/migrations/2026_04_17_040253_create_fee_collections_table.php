@@ -11,7 +11,7 @@ return new class extends Migration
         // ফি গ্রহণ - মূল transaction table
         Schema::create('fee_collections', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('madrasa_id')->constrained('madrasas')->onDelete('cascade');
+            $table->foreignId('institution_id')->constrained('madrasas')->onDelete('cascade');
             $table->foreignId('student_id')->constrained('students')->onDelete('cascade');
             $table->unsignedBigInteger('fee_setting_id')->nullable();
             $table->unsignedBigInteger('sub_ledger_id')->nullable();

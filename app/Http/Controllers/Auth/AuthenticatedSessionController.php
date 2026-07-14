@@ -17,114 +17,72 @@ class AuthenticatedSessionController extends Controller
         return view('auth.login');
     }
 
-    public function store(Request $request): RedirectResponse
-    {
-        // Validate login inputs
-        $request->validate([
-            'login' => 'required|string',
-            'password' => 'required|string',
-            'madrasa_code' => 'nullable|string',
-        ]);
-
-        $loginField = $request->login;
-        $madrasaCode = $request->madrasa_code;
-
-        // Query builder with multi-tenant support
-        $query = User::query();
-
-        // If madrasa code is provided, filter by madrasa code
-        if ($madrasaCode) {
-            $query->whereHas('madrasa', function($q) use ($madrasaCode) {
-                $q->where('madrasa_code', $madrasaCode);
-            });
-        }
-
-        // Check if login is email or username
-        if (filter_var($loginField, FILTER_VALIDATE_EMAIL)) {
-            $query->where('email', $loginField);
-        } else {
-            $query->where('username', $loginField);
-        }
-
-        $user = $query->first();
-
-        // User not found
-        if (!$user) {
-            return back()->withErrors([
-                'login' => 'ইউজারনেম/ইমেইল বা পাসওয়ার্ড ভুল।',
-            ])->onlyInput('login', 'madrasa_code');
-        }
-
-        // Check if user is active
-        if (!$user->status) {
-            return back()->withErrors([
-                'login' => 'আপনার অ্যাকাউন্টটি নিষ্ক্রিয় করা হয়েছে।',
-            ])->onlyInput('login', 'madrasa_code');
-        }
-
-        // Check madrasa status (for non-super admin)
-        if (!$user->is_super_admin && $user->madrasa && !$user->madrasa->status) {
-            return back()->withErrors([
-                'login' => 'মাদ্রাসাটি নিষ্ক্রিয় করা হয়েছে।',
-            ])->onlyInput('login', 'madrasa_code');
-        }
-
-        // Check password
-        if (!Hash::check($request->password, $user->password)) {
-            return back()->withErrors([
-                'login' => 'ইউজারনেম/ইমেইল বা পাসওয়ার্ড ভুল।',
-            ])->onlyInput('login', 'madrasa_code');
-        }
-
-        // Update last login info
-        $user->update([
-            'last_login_at' => now(),
-            'last_login_ip' => $request->ip(),
-        ]);
-
-        // Login user
-        Auth::login($user, $request->boolean('remember'));
-
-        $request->session()->regenerate();
-
-        // Redirect based on role (FIXED)
-        return $this->redirectBasedOnRole($user);
-    }
-
-    private function redirectBasedOnRole($user): RedirectResponse
+public function store(Request $request): RedirectResponse
 {
-    // Super Admin
-    if ($user->is_super_admin) {
-        return redirect('/super-admin/dashboard');
+    $request->validate([
+        'phone' => ['required', 'string'],
+        'password' => ['required', 'string'],
+    ]);
+
+    // Find user by phone
+    $user = User::with('institution')
+        ->where('phone', $request->phone)
+        ->first();
+
+    if (!$user) {
+        return back()->withErrors([
+            'phone' => 'মোবাইল নম্বর অথবা পাসওয়ার্ড সঠিক নয়।',
+        ])->onlyInput('phone');
     }
-    
-    // Soft Admin
-    if ($user->is_soft_admin) {
-        return redirect('/soft-admin/dashboard');
+
+    // User status
+    if (!$user->status) {
+        return back()->withErrors([
+            'phone' => 'আপনার অ্যাকাউন্ট নিষ্ক্রিয় করা হয়েছে।',
+        ])->onlyInput('phone');
     }
-    
-    // Madrasa Admin
-    if ($user->is_madrasa_admin) {
-        return redirect('/madrasa-admin/dashboard');
+
+    // Institution status
+    if (
+        !$user->is_super_admin &&
+        !$user->is_soft_admin &&
+        $user->institution &&
+        !$user->institution->status
+    ) {
+        return back()->withErrors([
+            'phone' => 'প্রতিষ্ঠানটি বর্তমানে নিষ্ক্রিয়।',
+        ])->onlyInput('phone');
     }
-    
-    // Teacher
-    if ($user->is_teacher) {
-        return redirect('/teacher/dashboard');
+
+    // Password
+    if (!Hash::check($request->password, $user->password)) {
+        return back()->withErrors([
+            'phone' => 'মোবাইল নম্বর অথবা পাসওয়ার্ড সঠিক নয়।',
+        ])->onlyInput('phone');
     }
-    
-    // Student
-    if ($user->is_student) {
-        return redirect('/student/dashboard');
-    }
-    
-    // Guardian
-    if ($user->is_guardian) {
-        return redirect('/guardian/dashboard');
-    }
-    
-    // Default fallback
-    return redirect('/');
+
+    // Update login info
+    $user->update([
+        'last_login_at' => now(),
+        'last_login_ip' => $request->ip(),
+    ]);
+
+    // Login
+// Login
+Auth::login($user, $request->boolean('remember'));
+
+$request->session()->regenerate();
+
+// Save Institution Context
+session([
+    'institution_id' => $user->institution_id,
+]);
+
+return redirect()->route('dashboard');
+}
+private function redirectBasedOnRole($user): RedirectResponse
+{
+    return redirect()->route('dashboard');
 }
 
     public function destroy(Request $request): RedirectResponse

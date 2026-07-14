@@ -5,13 +5,12 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
-
 class User extends Authenticatable
 {
     use HasFactory, Notifiable;
 
     protected $fillable = [
-        'madrasa_id',
+        'institution_id',
         'role_id',
         'institution_user_id',
         'username',
@@ -77,10 +76,10 @@ class User extends Authenticatable
     ];
 
     // Relationships
-    public function madrasa()
-    {
-        return $this->belongsTo(Madrasa::class);
-    }
+public function institution()
+{
+    return $this->belongsTo(Madrasa::class, 'institution_id');
+}
 
     public function role()
     {
@@ -96,9 +95,7 @@ class User extends Authenticatable
     {
         return $this->hasOne(Teacher::class);
     }
-    public function institution() {
-        return $this->belongsTo(Institution::class);
-    }
+
     public function presentDivision()
     {
         return $this->belongsTo(Division::class, 'present_division_id');
@@ -163,38 +160,40 @@ class User extends Authenticatable
         if ($this->permanent_postal_code) $address[] = $this->permanent_postal_code;
         return implode(', ', $address);
     }
-
+public function hasRole(string $role): bool
+{
+    return optional($this->role)->slug === $role;
+}
     // Role check methods
-    public function getIsSuperAdminAttribute()
-    {
-        return $this->role && $this->role->slug === 'super-admin';
-    }
+public function getIsSuperAdminAttribute()
+{
+    return $this->hasRole('super-admin');
+}
 
-    public function getIsSoftAdminAttribute()
-    {
-        return $this->role && $this->role->slug === 'soft-admin';
-    }
+public function getIsSoftAdminAttribute()
+{
+    return $this->hasRole('soft-admin');
+}
 
-    public function getIsMadrasaAdminAttribute()
-    {
-        return $this->role && $this->role->slug === 'madrasa-admin';
-    }
+public function getIsMadrasaAdminAttribute()
+{
+    return $this->hasRole('madrasa-admin');
+}
 
-    public function getIsTeacherAttribute()
-    {
-        return $this->role && $this->role->slug === 'teacher';
-    }
+public function getIsTeacherAttribute()
+{
+    return $this->hasRole('teacher');
+}
 
-    public function getIsStudentAttribute()
-    {
-        return $this->student()->exists();
-    }
+public function getIsStudentAttribute()
+{
+    return $this->hasRole('student');
+}
 
-    public function getIsGuardianAttribute()
-    {
-        return $this->role && $this->role->slug === 'guardian';
-    }
-
+public function getIsGuardianAttribute()
+{
+    return $this->hasRole('guardian');
+}
     // Scopes
     public function scopeActive($query)
     {
@@ -212,7 +211,7 @@ class User extends Authenticatable
         });
     }
 
-public static function generateInstitutionUserId($madrasaId, $userType)
+public static function generateInstitutionUserId($institutionId, $userType)
 {
     $role = Role::where('slug', $userType)->first();
 
@@ -220,7 +219,7 @@ public static function generateInstitutionUserId($madrasaId, $userType)
         return 100;
     }
 
-    $lastUser = self::where('madrasa_id', $madrasaId)
+    $lastUser = self::where('institution_id', $institutionId)
         ->where('role_id', $role->id)
         ->whereNotNull('institution_user_id')
         ->orderByRaw('CAST(institution_user_id AS UNSIGNED) DESC')
@@ -230,16 +229,17 @@ public static function generateInstitutionUserId($madrasaId, $userType)
         return (int)$lastUser->institution_user_id + 1;
     }
 
-    return match ($userType) {
-        'student' => 101,
-        'teacher' => 201,
-        'guardian' => 301,
-        'madrasa-admin' => 401,
-        'soft-admin' => 501,
-        default => 100,
-    };
+return match ($userType) {
+    'student'       => 101,
+    'teacher'       => 201,
+    'guardian'      => 301,
+    'madrasa-admin' => 401,
+    'soft-admin'    => 501,
+    'super-admin'   => 601,
+    default         => 100,
+};
 }
-public static function previewInstitutionUserId($madrasaId, $roleSlug)  // institution_id -> madrasa_id
+public static function previewInstitutionUserId($institutionId, $roleSlug)  // institution_id -> madrasa_id
 {
     $baseNumber = match($roleSlug) {
         'student' => 101,
@@ -251,7 +251,7 @@ public static function previewInstitutionUserId($madrasaId, $roleSlug)  // insti
         default => 100,
     };
     
-    $lastUser = self::where('madrasa_id', $madrasaId)  // institution_id -> madrasa_id
+    $lastUser = self::where('institution_id', $institutionId)  // institution_id -> madrasa_id
         ->where('role_id', Role::where('slug', $roleSlug)->first()?->id)
         ->orderBy('id', 'desc')
         ->first();
@@ -267,19 +267,50 @@ public static function previewInstitutionUserId($madrasaId, $roleSlug)  // insti
 }
     public function getFormattedInstitutionIdAttribute()
     {
-        if (!$this->institution_user_id) {
-            return '—';
-        }
-        
-        $prefix = substr($this->institution_user_id, 0, 3);
-        $roleName = match($prefix) {
-            'STU' => 'শিক্ষার্থী',
-            'TCH' => 'শিক্ষক',
-            'GRD' => 'অভিভাবক',
-            'ADM' => 'অ্যাডমিন',
-            default => 'ইউজার'
-        };
-        
-        return "{$this->institution_user_id} ({$roleName})";
+        return $this->institution_user_id.' - '.optional($this->role)->role_name;
     }
+/*
+|--------------------------------------------------------------------------
+| Permissions
+|--------------------------------------------------------------------------
+*/
+
+public function permissions()
+{
+    return $this->belongsToMany(
+        Permission::class,
+        'user_permissions'
+    )
+    ->withPivot('allow')
+    ->withTimestamps();
+}
+public function hasPermission(string $permission): bool
+{
+    // Super Admin
+    if ($this->is_super_admin) {
+        return true;
+    }
+
+    // Direct User Permission (Highest Priority)
+    $userPermission = $this->permissions()
+        ->where('slug', $permission)
+        ->where('status', 1)
+        ->first();
+
+    if ($userPermission) {
+        return (bool) $userPermission->pivot->allow;
+    }
+
+    // No role
+    if (!$this->role) {
+        return false;
+    }
+
+    // Role Permission
+    return $this->role
+        ->permissions()
+        ->where('slug', $permission)
+        ->where('status', 1)
+        ->exists();
+}
 }

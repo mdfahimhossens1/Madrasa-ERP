@@ -13,7 +13,7 @@ return new class extends Migration
     {
         Schema::create('funds', function (Blueprint $table) {
         $table->id();
-        $table->unsignedBigInteger('madrasa_id');
+        $table->unsignedBigInteger('institution_id');
         $table->foreignId('user_id')->constrained()->cascadeOnDelete();
         $table->string('name');
         $table->decimal('balance', 10, 2)->default(0);

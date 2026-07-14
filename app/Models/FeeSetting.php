@@ -4,16 +4,16 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-
+use App\Models\Traits\BelongsToInstitution;
 class FeeSetting extends Model
 {
-    use HasFactory;
+    use HasFactory, BelongsToInstitution;
 
     protected $fillable = [
         'academic_year_id',
         'class_id',
         'fee_group_id',   
-        'madrasa_id',
+        'institution_id',
         'chattra_abashik_new',
         'chattra_abashik_old',
         'chattra_onabashik_new',

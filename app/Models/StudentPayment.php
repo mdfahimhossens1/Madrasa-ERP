@@ -3,11 +3,14 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
-
+use App\Models\Traits\BelongsToInstitution;
 class StudentPayment extends Model
 {
+
+    use BelongsToInstitution;
+
     protected $fillable = [
-        'madrasa_id',
+        'institution_id',
         'student_id',
         'user_id',
         'fee_id',

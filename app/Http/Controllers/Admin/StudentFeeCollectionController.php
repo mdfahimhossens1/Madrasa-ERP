@@ -21,12 +21,12 @@ class StudentFeeCollectionController extends Controller
 
 public function index()
 {
-    $madrasaId = auth()->user()->madrasa_id ?? 1;
+    $institutionId = auth()->user()->institution_id ?? 1;
 
     $years    = AcademicYear::where('status', 'active')->orderBy('id', 'desc')->get();
     $cashiers = Cashier::latest()->get();
 
-    $todayTotal = \App\Models\FeeCollection::where('madrasa_id', $madrasaId)
+    $todayTotal = \App\Models\FeeCollection::where('institution_id', $institutionId)
         ->whereDate('collection_date', today())
         ->sum('paid_amount');
 
@@ -35,14 +35,14 @@ public function index()
     // active দেখানো হয় UI-তে), তাই প্রথম cashier ধরে initial value বের করছি।
     $defaultCashierId = $cashiers->first()?->id;
     $myTotal = $defaultCashierId
-        ? \App\Models\FeeCollection::where('madrasa_id', $madrasaId)
+        ? \App\Models\FeeCollection::where('institution_id', $institutionId)
             ->whereDate('collection_date', today())
             ->where('collected_by', $defaultCashierId)
             ->sum('paid_amount')
         : 0;
 
     $payments = \App\Models\FeeCollection::with(['student.user', 'collector'])
-        ->where('madrasa_id', $madrasaId)
+        ->where('institution_id', $institutionId)
         ->whereDate('collection_date', today())
         ->latest()
         ->get()
@@ -80,7 +80,7 @@ private function getStudentFeeAmount($student, $payType = 'monthly')
         return ['total' => 0, 'items' => []];
     }
 
-    $madrasaId = auth()->user()->madrasa_id ?? 1;
+    $institutionId = auth()->user()->institution_id ?? 1;
 
     // monthly → type = 'monthly'
     // admission → type = 'ekkalin'
@@ -92,7 +92,7 @@ private function getStudentFeeAmount($student, $payType = 'monthly')
     };
 
     $feeSettings = FeeSetting::with(['feeGroup.subLedger'])
-        ->where('madrasa_id', $madrasaId)
+        ->where('institution_id', $institutionId)
         ->where('academic_year_id', $admission->academic_year_id)
         ->where('class_id', $admission->class_id)
         ->whereHas('feeGroup', function ($q) use ($feeGroupType) {
@@ -104,7 +104,7 @@ private function getStudentFeeAmount($student, $payType = 'monthly')
     // class specific না পেলে global try করো
     if ($feeSettings->isEmpty()) {
         $feeSettings = FeeSetting::with(['feeGroup.subLedger'])
-            ->where('madrasa_id', $madrasaId)
+            ->where('institution_id', $institutionId)
             ->where('academic_year_id', $admission->academic_year_id)
             ->whereNull('class_id')
             ->whereHas('feeGroup', function ($q) use ($feeGroupType) {
@@ -149,27 +149,27 @@ private function getStudentFeeAmount($student, $payType = 'monthly')
 
 private function getFeeFundAndLedger(): array
 {
-    $madrasaId = auth()->user()->madrasa_id ?? 1;
+    $institutionId = auth()->user()->institution_id ?? 1;
 
     // ফান্ড — না থাকলে প্রথমটা নাও, একেবারেই না থাকলে তৈরি করো
-    $fund = Fund::where('madrasa_id', $madrasaId)->first();
+    $fund = Fund::where('institution_id', $institutionId)->first();
 
     if (!$fund) {
         $fund = Fund::create([
-            'madrasa_id' => $madrasaId,
+            'institution_id' => $institutionId,
             'name'       => 'সাধারণ ফান্ড',
         ]);
     }
 
     // লেজার — fee income এর জন্য 'ছাত্র বেতন' নামে খুঁজবে, না থাকলে তৈরি করবে
-    $ledger = Ledger::where('madrasa_id', $madrasaId)
+    $ledger = Ledger::where('institution_id', $institutionId)
         ->where('fund_id', $fund->id)
         ->where('name', 'ছাত্র বেতন')
         ->first();
 
     if (!$ledger) {
         $ledger = Ledger::create([
-            'madrasa_id' => $madrasaId,
+            'institution_id' => $institutionId,
             'user_id'    => auth()->id(),
             'name'       => 'ছাত্র বেতন',
             'type'       => 'income',
@@ -533,13 +533,13 @@ if ($req->pay_type === 'monthly') {
         $totalDiscount  = $allPayments->sum('discount');
 
         // ✅ আজকের সর্বমোট সংগ্রহ (madrasa-wide) ও 'আমার সংগ্রহ' (যে cashier ফর্মে সিলেক্ট করা ছিল)
-        $madrasaId  = auth()->user()->madrasa_id ?? 1;
-        $todayTotal = \App\Models\FeeCollection::where('madrasa_id', $madrasaId)
+        $institutionId  = auth()->user()->institution_id ?? 1;
+        $todayTotal = \App\Models\FeeCollection::where('institution_id', $institutionId)
             ->whereDate('collection_date', today())
             ->sum('paid_amount');
 
         $myTotal = $cashierId
-            ? \App\Models\FeeCollection::where('madrasa_id', $madrasaId)
+            ? \App\Models\FeeCollection::where('institution_id', $institutionId)
                 ->whereDate('collection_date', today())
                 ->where('collected_by', $cashierId)
                 ->sum('paid_amount')
@@ -574,10 +574,10 @@ if ($req->pay_type === 'monthly') {
 
 public function todayPayments(Request $req)
 {
-    $madrasaId = auth()->user()->madrasa_id ?? 1;
+    $institutionId = auth()->user()->institution_id ?? 1;
 
     $query = \App\Models\FeeCollection::with(['student.user', 'collector'])
-        ->where('madrasa_id', $madrasaId);
+        ->where('institution_id', $institutionId);
 
     if ($req->search) {
         $query->where(function ($q) use ($req) {
@@ -590,7 +590,7 @@ public function todayPayments(Request $req)
 
     $payments = $query->latest()->take(50)->get();
 
-    $todayTotal = \App\Models\FeeCollection::where('madrasa_id', $madrasaId)
+    $todayTotal = \App\Models\FeeCollection::where('institution_id', $institutionId)
         ->whereDate('collection_date', today())
         ->sum('paid_amount');
 
@@ -598,7 +598,7 @@ public function todayPayments(Request $req)
     // (form-e dropdown-e jei cashier select kora ache, তার আজকের কালেকশন)
     $cashierId = $req->cashier_id ?? null;
     $myTotal = $cashierId
-        ? \App\Models\FeeCollection::where('madrasa_id', $madrasaId)
+        ? \App\Models\FeeCollection::where('institution_id', $institutionId)
             ->whereDate('collection_date', today())
             ->where('collected_by', $cashierId)
             ->sum('paid_amount')

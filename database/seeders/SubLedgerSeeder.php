@@ -38,7 +38,7 @@ class SubLedgerSeeder extends Seeder
                 ],
 
                 [
-                    'madrasa_id' => 1,
+                    'institution_id' => 1,
                 ]
             );
         }

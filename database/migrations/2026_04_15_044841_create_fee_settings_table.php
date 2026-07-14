@@ -21,7 +21,7 @@ return new class extends Migration
                 ->constrained('classes')
                 ->nullOnDelete();
 
-            $table->unsignedBigInteger('madrasa_id')->nullable()->index();
+            $table->unsignedBigInteger('institution_id')->nullable()->index();
             $table->decimal('chattra_abashik_new', 15, 2)->nullable();
             $table->decimal('chattra_abashik_old', 15, 2)->nullable();
             $table->decimal('chattra_onabashik_new', 15, 2)->nullable();

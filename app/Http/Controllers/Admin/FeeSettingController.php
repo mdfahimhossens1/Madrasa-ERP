@@ -14,7 +14,7 @@ class FeeSettingController extends Controller
 {
     public function index()
     {
-        $madrasaId = auth()->user()->madrasa_id;
+        $institutionId = auth()->user()->institution_id;
 
         $academicYears = AcademicYear::where('status', 'active')
             ->orderBy('id', 'desc')
@@ -26,14 +26,14 @@ class FeeSettingController extends Controller
 
         // ✅ SubLedger এর বদলে FeeGroup
     $feeGroups = FeeGroup::with('subLedger') 
-        ->where('madrasa_id', $madrasaId)
+        ->where('institution_id', $institutionId)
         ->where('is_active', 1)
         ->orderBy('name')
         ->get();
 
         // ✅ subLedger এর বদলে feeGroup relation
         $feeSettings = FeeSetting::with(['academicYear', 'class', 'feeGroup.subLedger'])
-            ->where('madrasa_id', $madrasaId)
+            ->where('institution_id', $institutionId)
             ->latest()
             ->get();
 
@@ -54,9 +54,9 @@ class FeeSettingController extends Controller
         ]);
 
         try {
-            $madrasaId = auth()->user()->madrasa_id;
+            $institutionId = auth()->user()->institution_id;
 
-            $query = FeeSetting::where('madrasa_id', $madrasaId)
+            $query = FeeSetting::where('institution_id', $institutionId)
                 ->where('academic_year_id', $request->academic_year_id)
                 ->where('fee_group_id', $request->fee_group_id); // ✅
 
@@ -91,7 +91,7 @@ class FeeSettingController extends Controller
         ]);
 
         try {
-            $madrasaId = auth()->user()->madrasa_id;
+            $institutionId = auth()->user()->institution_id;
 
             $data = $request->only([
                 'chattra_abashik_new', 'chattra_abashik_old',
@@ -104,14 +104,14 @@ class FeeSettingController extends Controller
                 'chhatri_nightcare_new', 'chhatri_nightcare_old',
             ]);
 
-            $data['madrasa_id']       = $madrasaId;
+            $data['institution_id']       = $institutionId;
             $data['academic_year_id'] = $request->academic_year_id;
             $data['class_id']         = $request->class_id ?: null;
             $data['fee_group_id']     = $request->fee_group_id;
 
             FeeSetting::updateOrCreate(
                 [
-                    'madrasa_id'       => $madrasaId,
+                    'institution_id'       => $institutionId,
                     'academic_year_id' => $data['academic_year_id'],
                     'class_id'         => $data['class_id'],
                     'fee_group_id'     => $data['fee_group_id'],
@@ -134,9 +134,9 @@ class FeeSettingController extends Controller
         ]);
 
         try {
-            $madrasaId = auth()->user()->madrasa_id;
+            $institutionId = auth()->user()->institution_id;
 
-            FeeSetting::where('madrasa_id', $madrasaId)
+            FeeSetting::where('institution_id', $institutionId)
                 ->where('academic_year_id', $request->academic_year_id)
                 ->delete();
 

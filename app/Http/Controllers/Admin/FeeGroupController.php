@@ -13,10 +13,10 @@ class FeeGroupController extends Controller
 {
     public function index(Request $request)
     {
-        $madrasaId = auth()->user()->madrasa_id ?? 1;
+        $institutionId = auth()->user()->institution_id ?? 1;
 
         $query = FeeGroup::with(['fund', 'ledger', 'subLedger'])
-            ->where('madrasa_id', $madrasaId);
+            ->where('institution_id', $institutionId);
 
         // Filters
         if ($request->filled('fund_id')) {
@@ -38,17 +38,17 @@ class FeeGroupController extends Controller
         $feeGroups = $query->latest()->paginate(15);
 
         // Fund List
-        $funds = Fund::where('madrasa_id', $madrasaId)->get();
+        $funds = Fund::where('institution_id', $institutionId)->get();
 
         // Ledger List
-        $generalLedgers = Ledger::where('madrasa_id', $madrasaId)
+        $generalLedgers = Ledger::where('institution_id', $institutionId)
             ->when($request->fund_id, function ($q) use ($request) {
                 $q->where('fund_id', $request->fund_id);
             })
             ->get();
 
         // Sub Ledger List
-        $subLedgers = SubLedger::where('madrasa_id', $madrasaId)
+        $subLedgers = SubLedger::where('institution_id', $institutionId)
             ->when($request->general_ledger_id, function ($q) use ($request) {
                 $q->where('ledger_id', $request->general_ledger_id);
             })
@@ -71,7 +71,7 @@ class FeeGroupController extends Controller
         'type'          => 'required|in:ekkalin,monthly,others',
     ]);
 
-    $madrasaId = auth()->user()->madrasa_id ?? 1;
+    $institutionId = auth()->user()->institution_id ?? 1;
 
     /*
     |--------------------------------------------------------------------------
@@ -81,7 +81,7 @@ class FeeGroupController extends Controller
     | আবার save হতে পারবে না
     */
 
-    $exists = FeeGroup::where('madrasa_id', $madrasaId)
+    $exists = FeeGroup::where('institution_id', $institutionId)
         ->where('fund_id', $request->fund_id)
         ->where('ledger_id', $request->ledger_id)
         ->where('sub_ledger_id', $request->sub_ledger_id)
@@ -116,7 +116,7 @@ class FeeGroupController extends Controller
 
     FeeGroup::create([
 
-        'madrasa_id'    => $madrasaId,
+        'institution_id'    => $institutionId,
 
         'fund_id'       => $request->fund_id,
 
@@ -144,13 +144,13 @@ class FeeGroupController extends Controller
 
     public function edit(FeeGroup $fee)
     {
-        $madrasaId = auth()->user()->madrasa_id ?? 1;
+        $institutionId = auth()->user()->institution_id ?? 1;
 
-        $funds = Fund::where('madrasa_id', $madrasaId)->get();
+        $funds = Fund::where('institution_id', $institutionId)->get();
 
-        $generalLedgers = Ledger::where('madrasa_id', $madrasaId)->get();
+        $generalLedgers = Ledger::where('institution_id', $institutionId)->get();
 
-        $subLedgers = SubLedger::where('madrasa_id', $madrasaId)->get();
+        $subLedgers = SubLedger::where('institution_id', $institutionId)->get();
 
         return view('admin.fee-groups.edit', compact(
             'fee',
@@ -190,9 +190,9 @@ class FeeGroupController extends Controller
 
     public function getLedgers($fund_id)
     {
-        $madrasaId = auth()->user()->madrasa_id ?? 1;
+        $institutionId = auth()->user()->institution_id ?? 1;
 
-        $ledgers = Ledger::where('madrasa_id', $madrasaId)
+        $ledgers = Ledger::where('institution_id', $institutionId)
             ->where('fund_id', $fund_id)
             ->get();
 
@@ -201,9 +201,9 @@ class FeeGroupController extends Controller
 
     public function getSubLedgers($ledger_id)
     {
-        $madrasaId = auth()->user()->madrasa_id ?? 1;
+        $institutionId = auth()->user()->institution_id ?? 1;
 
-        $subLedgers = SubLedger::where('madrasa_id', $madrasaId)
+        $subLedgers = SubLedger::where('institution_id', $institutionId)
             ->where('ledger_id', $ledger_id)
             ->get();
 

@@ -12,7 +12,7 @@ return new class extends Migration
             $table->id();
 
             $table->unsignedBigInteger('user_id');
-            $table->unsignedBigInteger('madrasa_id');
+            $table->unsignedBigInteger('institution_id');
             $table->unsignedBigInteger('academic_year_id');
             $table->unsignedBigInteger('class_id')->nullable();
             $table->unsignedBigInteger('section_id')->nullable();
@@ -24,9 +24,9 @@ return new class extends Migration
             $table->unsignedBigInteger('created_by')->nullable();
             $table->unsignedBigInteger('updated_by')->nullable();
             $table->timestamps();
-            $table->unique(['student_id', 'madrasa_id']);
+            $table->unique(['student_id', 'institution_id']);
             $table->index('user_id');
-            $table->index('madrasa_id');
+            $table->index('institution_id');
             $table->index('academic_year_id');
             $table->index('class_id');
             $table->index('section_id');

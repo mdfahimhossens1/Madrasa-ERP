@@ -5,16 +5,16 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-
+use App\Models\Traits\BelongsToInstitution;
 class Section extends Model
 {
-    use HasFactory;
+    use HasFactory, BelongsToInstitution;
 
     protected $fillable = [
         'name',
         'name_bn',
         'class_id',
-        'madrasa_id',
+        'institution_id',
         'is_active',
         'created_by',
         'updated_by',

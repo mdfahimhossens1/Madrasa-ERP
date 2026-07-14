@@ -10,7 +10,7 @@ return new class extends Migration
     {
         Schema::create('users', function (Blueprint $table) {
             $table->id();
-            $table->unsignedBigInteger('madrasa_id')->nullable();
+            $table->unsignedBigInteger('institution_id')->nullable();
             $table->unsignedBigInteger('role_id');
             // $table->unsignedBigInteger('student_id')->nullable();  
             // $table->unsignedBigInteger('academic_year_id')->nullable();  

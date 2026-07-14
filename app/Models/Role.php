@@ -69,4 +69,13 @@ class Role extends Model
     {
         return $query->where('level', $level);
     }
+
+public function permissions()
+{
+    return $this->belongsToMany(
+        Permission::class,
+        'role_permissions'
+    )->withTimestamps();
+}
+
 }

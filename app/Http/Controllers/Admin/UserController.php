@@ -35,7 +35,7 @@ class UserController extends Controller
         if (!$authUser->is_super_admin) {
 
             // Same madrasa users only
-            $query->where('madrasa_id', $authUser->madrasa_id);
+            $query->where('institution_id', $authUser->institution_id);
 
             /*
             |--------------------------------------------------------------------------
@@ -144,7 +144,7 @@ class UserController extends Controller
 
         } else {
 
-            $madrasas = Madrasa::where('id', $authUser->madrasa_id)->get();
+            $institutions = Madrasa::where('id', $authUser->institution_id)->get();
         }
 
         $roles = Role::all();
@@ -159,7 +159,7 @@ class UserController extends Controller
         |--------------------------------------------------------------------------
         */
 
-        $institutionId = $authUser->madrasa_id ?? 1;
+        $institutionId = $authUser->institution_id;
 
         $previewIds = [];
 
@@ -187,7 +187,7 @@ class UserController extends Controller
         return view('admin.users.create', compact(
             'userTypes',
             'roles',
-            'madrasas',
+            'institutions',
             'divisions',
             'previewIds',
             'academicYears',
@@ -261,11 +261,11 @@ class UserController extends Controller
 
             if ($authUser->is_super_admin) {
 
-                $madrasaId = $request->madrasa_id;
+                $institutionId = $request->institution_id;
 
             } else {
 
-                $madrasaId = $authUser->madrasa_id;
+                $institutionId = $authUser->institution_id;
             }
 
             /*
@@ -286,7 +286,7 @@ class UserController extends Controller
 
             if ($authUser->is_super_admin) {
 
-                $rules['madrasa_id'] ='required|exists:madrasas,id';
+                $rules['institution_id'] = 'required|exists:madrasas,id';
             }
 
             if ($isStudent) {
@@ -330,7 +330,7 @@ class UserController extends Controller
 
             $institutionUserId =
                 User::generateInstitutionUserId(
-                    $madrasaId,
+                    $institutionId,
                     $role->slug
                 );
 
@@ -342,7 +342,7 @@ class UserController extends Controller
 
             $user = User::create([
                 'institution_user_id' => $institutionUserId,
-                'madrasa_id' => $madrasaId,
+                'institution_id' => $institutionId,
                 'role_id' => $role->id,
                 'username' => $username,
                 'email' => $request->email,
@@ -436,13 +436,13 @@ class UserController extends Controller
 
                 $studentId =
                     $this->generateStudentId(
-                        $madrasaId,
+                        $institutionId,
                         $academicYear->id
                     );
 
                 Student::create([
                     'user_id' => $user->id,
-                    'madrasa_id' => $madrasaId,
+                    'madrasa_id' => $institutionId,
                     'academic_year_id' =>
                         $academicYear->id,
                     'class_id' =>
@@ -490,7 +490,7 @@ class UserController extends Controller
     }
 
     private function generateStudentId(
-        $madrasaId,
+        $institutionId,
         $academicYearId
     ) {
 
@@ -498,7 +498,7 @@ class UserController extends Controller
 
             $lastStudent = Student::where(
                     'madrasa_id',
-                    $madrasaId
+                    $institutionId
                 )
                 ->where(
                     'academic_year_id',
@@ -542,7 +542,7 @@ class UserController extends Controller
             }
 
             $studentId =
-                'STU-' . $madrasaId . '-' . $academicYearId . '-' . $newNumber;
+                'STU-' . $institutionId . '-' . $academicYearId . '-' . $newNumber;
 
             if (
                 Student::where(
@@ -552,7 +552,7 @@ class UserController extends Controller
             ) {
 
                 return $this->generateStudentId(
-                    $madrasaId,
+                    $institutionId,
                     $academicYearId
                 );
             }
@@ -563,7 +563,7 @@ class UserController extends Controller
 
             return
                 'STU-' .
-                $madrasaId .
+                $institutionId .
                 '-' .
                 $academicYearId .
                 '-' .
@@ -833,7 +833,7 @@ class UserController extends Controller
     {
         $userType = $request->user_type;
 
-        $madrasaId =
+        $institutionId =
             $request->madrasa_id ?? 1;
 
         $role = Role::where(
@@ -853,7 +853,7 @@ class UserController extends Controller
 
         $lastUser = User::where(
                 'madrasa_id',
-                $madrasaId
+                $institutionId
             )
             ->where(
                 'role_id',

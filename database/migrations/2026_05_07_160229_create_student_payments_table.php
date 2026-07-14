@@ -14,7 +14,7 @@ return new class extends Migration
         Schema::create('student_payments', function (Blueprint $table) {
     $table->id();
 
-    $table->unsignedBigInteger('madrasa_id');
+    $table->unsignedBigInteger('institution_id');
     $table->unsignedBigInteger('student_id');
     $table->unsignedBigInteger('user_id'); // shortcut for faster query
 
@@ -40,7 +40,7 @@ return new class extends Migration
     // index
     $table->index('student_id');
     $table->index('user_id');
-    $table->index('madrasa_id');
+    $table->index('institution_id');
         });
     }
 

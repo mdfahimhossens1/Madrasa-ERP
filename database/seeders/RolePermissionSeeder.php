@@ -18,6 +18,8 @@ class RolePermissionSeeder extends Seeder
 
         $this->assignAllPermissions('super-admin');
 
+
+        $this->assignAllPermissions('soft-admin');
         /*
         |--------------------------------------------------------------------------
         | Support Admin
@@ -46,42 +48,79 @@ class RolePermissionSeeder extends Seeder
         |--------------------------------------------------------------------------
         */
 
-        $this->assignModules(
-            'madrasa-admin',
-            [
-                'Student',
-                'Teacher',
-                'Guardian',
-                'Admission',
+$this->assignPermissions('madrasa-admin',[
 
-                'Academic Year',
-                'Class',
-                'Section',
+'dashboard.view',
 
-                'Attendance',
-                'Exam',
-                'Result',
+'student.view',
+'student.create',
+'student.edit',
+'student.delete',
+'student.photo',
+'student.report',
+'student.export',
+'student.import',
 
-                'Fee',
-                'Fee Type',
-                'Fee Setting',
-                'Fee Collection',
+'guardian.view',
+'guardian.create',
+'guardian.edit',
+'guardian.delete',
 
-                'Fund',
-                'Ledger',
-                'Sub Ledger',
+'admission.view',
+'admission.create',
+'admission.edit',
+'admission.delete',
+'admission.approve',
+'admission.reject',
 
-                'Transaction',
+'class.view',
+'class.create',
+'class.edit',
+'class.delete',
 
-                'Cashier',
-                'Payment Method',
+'section.view',
+'section.create',
+'section.edit',
+'section.delete',
 
-                'Income Expense Report',
-                'Student Report',
+'attendance.view',
+'attendance.take',
+'attendance.edit',
+'attendance.report',
 
-                'Notification',
-            ]
-        );
+'exam.view',
+'exam.create',
+'exam.edit',
+'exam.delete',
+
+'result.view',
+'result.publish',
+'result.edit',
+
+'fee.view',
+'fee.create',
+'fee.edit',
+'fee.collect',
+'fee.report',
+
+'fee-type.view',
+'fee-type.create',
+'fee-type.edit',
+
+'income.view',
+'income.create',
+
+'expense.view',
+'expense.create',
+
+'invoice.view',
+'invoice.print',
+
+'payment.view',
+
+'accounting-report.view',
+
+]);
 
         /*
         |--------------------------------------------------------------------------
@@ -89,22 +128,22 @@ class RolePermissionSeeder extends Seeder
         |--------------------------------------------------------------------------
         */
 
-        $this->assignPermissions(
-            'teacher',
-            [
-                'student.view',
+$this->assignPermissions('teacher',[
 
-                'attendance.view',
-                'attendance.create',
-                'attendance.edit',
+'dashboard.view',
 
-                'result.view',
-                'result.create',
-                'result.edit',
+'student.view',
 
-                'exam.view',
-            ]
-        );
+'attendance.view',
+'attendance.take',
+'attendance.edit',
+
+'exam.view',
+
+'result.view',
+'result.edit',
+
+]);
 
         /*
         |--------------------------------------------------------------------------
@@ -112,13 +151,13 @@ class RolePermissionSeeder extends Seeder
         |--------------------------------------------------------------------------
         */
 
-        $this->assignPermissions(
-            'student',
-            [
-                'result.view',
-                'student.view',
-            ]
-        );
+$this->assignPermissions('student',[
+
+'dashboard.view',
+
+'result.view',
+
+]);
 
         /*
         |--------------------------------------------------------------------------
@@ -126,13 +165,15 @@ class RolePermissionSeeder extends Seeder
         |--------------------------------------------------------------------------
         */
 
-        $this->assignPermissions(
-            'guardian',
-            [
-                'student.view',
-                'result.view',
-            ]
-        );
+$this->assignPermissions('guardian',[
+
+'dashboard.view',
+
+'student.view',
+
+'result.view',
+
+]);
     }
 
     protected function assignAllPermissions(string $roleSlug): void
@@ -163,18 +204,22 @@ class RolePermissionSeeder extends Seeder
         $role->permissions()->syncWithoutDetaching($permissionIds);
     }
 
-    protected function assignPermissions(string $roleSlug, array $slugs): void
-    {
-        $role = Role::where('slug', $roleSlug)->first();
+    protected function assignPermissions(
+    string $roleSlug,
+    array $permissions
+): void {
 
-        if (!$role) {
-            return;
-        }
+    $role = Role::where('slug', $roleSlug)->first();
 
-        $permissionIds = Permission::whereIn('slug', $slugs)
-            ->pluck('id')
-            ->toArray();
-
-        $role->permissions()->syncWithoutDetaching($permissionIds);
+    if (!$role) {
+        return;
     }
+
+    $permissionIds = Permission::whereIn(
+        'slug',
+        $permissions
+    )->pluck('id');
+
+    $role->permissions()->sync($permissionIds);
+}
 }

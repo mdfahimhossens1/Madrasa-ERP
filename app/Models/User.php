@@ -286,31 +286,34 @@ public function permissions()
 }
 public function hasPermission(string $permission): bool
 {
-    // Super Admin
     if ($this->is_super_admin) {
         return true;
     }
 
-    // Direct User Permission (Highest Priority)
-    $userPermission = $this->permissions()
-        ->where('slug', $permission)
-        ->where('status', 1)
-        ->first();
-
-    if ($userPermission) {
-        return (bool) $userPermission->pivot->allow;
-    }
-
-    // No role
     if (!$this->role) {
         return false;
     }
 
-    // Role Permission
     return $this->role
         ->permissions()
         ->where('slug', $permission)
-        ->where('status', 1)
+        ->where('is_active', true)
+        ->exists();
+}
+public function hasPanel(string $panel): bool
+{
+    if ($this->is_super_admin) {
+        return true;
+    }
+
+    if (!$this->role) {
+        return false;
+    }
+
+    return $this->role
+        ->systemPanels()
+        ->where('slug', $panel)
+        ->where('is_active', true)
         ->exists();
 }
 }

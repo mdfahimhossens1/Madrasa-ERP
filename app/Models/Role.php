@@ -4,7 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-
+use App\Models\SystemPanel;
 class Role extends Model
 {
     use HasFactory;
@@ -69,7 +69,13 @@ class Role extends Model
     {
         return $query->where('level', $level);
     }
-
+public function systemPanels()
+{
+    return $this->belongsToMany(
+        SystemPanel::class,
+        'role_system_panel'
+    );
+}
 public function permissions()
 {
     return $this->belongsToMany(

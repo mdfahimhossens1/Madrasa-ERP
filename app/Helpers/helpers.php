@@ -80,4 +80,29 @@ if (! function_exists('has_role')) {
         return auth()->check()
             && auth()->user()->hasRole($role);
     }
+
+    
+}
+/*
+|--------------------------------------------------------------------------
+| System Panel Helper
+|--------------------------------------------------------------------------
+*/
+
+if (! function_exists('panel_enabled')) {
+
+    function panel_enabled(string $slug): bool
+    {
+        return \App\Models\SystemPanel::where('slug', $slug)
+            ->where('status', 1)
+            ->exists();
+    }
+}
+
+if (! function_exists('panel_disabled')) {
+
+    function panel_disabled(string $slug): bool
+    {
+        return ! panel_enabled($slug);
+    }
 }

@@ -26,319 +26,417 @@ use App\Http\Controllers\Admin\SettingController;
 use App\Http\Controllers\Admin\FeeTypeController;
 use App\Http\Controllers\Admin\StudentFeeCollectionController;
 use App\Http\Controllers\Admin\FeeReportController;
+use App\Http\Controllers\Admin\SystemPanelController;
+use App\Http\Controllers\Admin\SystemPanelManagerController;
+use App\Http\Controllers\Admin\PermissionController;
+use App\Http\Controllers\Admin\RolePermissionController;
 
 Route::get('/', function () {
     return view('welcome');
 });
 
-// লগইন করার পর ড্যাশবোর্ড রিডাইরেক্ট
-Route::middleware(['auth', 'institution'])->group(function () {
-
-    Route::get('/dashboard', [AdminDashboardController::class, 'index'])
-        ->name('dashboard');
-
-});
-
-// ============ Location AJAX Routes (Auth ছাড়া) ============
+// ============ Public AJAX Routes ============
 Route::get('get-districts/{divisionId}', [UserController::class, 'getDistricts'])->name('get.districts');
 Route::get('get-upazilas/{districtId}', [UserController::class, 'getUpazilas'])->name('get.upazilas');
 
-// ============ সুপার অ্যাডমিন এবং অ্যাডমিন এর জন্য ড্যাশবোর্ড রুটস ============
-Route::middleware(['auth', 'institution'])->group(function () {
-    
-    // ✅ Common (All Auth Users)
-    Route::middleware(['role:admin,super_admin,soft_admin,madrasa_admin,teacher,student,guardian'])->group(function () {
-        Route::get('dashboard/profile', [ProfileController::class, 'adminProfile'])->name('dashboard.profile');
-        Route::post('dashboard/profile', [ProfileController::class, 'adminProfileUpdate'])->name('dashboard.profile.update');
-        Route::get('dashboard/manage-account', [ProfileController::class, 'adminAccount'])->name('dashboard.account');
-        Route::post('dashboard/manage-account/password', [ProfileController::class, 'adminPasswordUpdate'])->name('dashboard.account.password');
-    });
-    
-    // ✅ Manager+ (admin/super_admin/soft_admin)
-    Route::middleware(['role:super_admin,soft_admin,madrasa_admin'])->group(function () {
-        Route::get('dashboard/notifications/poll', [NotificationController::class, 'poll'])->name('dashboard.notifications.poll');
-        Route::post('dashboard/notifications/mark-all-read', [NotificationController::class, 'markAllRead'])->name('dashboard.notifications.markAllRead');
-        Route::post('dashboard/notifications/clear-all', [NotificationController::class, 'clearAll'])->name('dashboard.notifications.clearAll');
-    });
-    
-    // ✅ Admin+ (super_admin/soft_admin)
-    Route::middleware(['role:super_admin,soft_admin'])->group(function () {
-        Route::get('dashboard/settings', [SettingController::class, 'index'])->name('dashboard.settings.index');
-    });
-    
-    // ==================== User Management ====================
-    Route::middleware(['role:super-admin,soft-admin,madrasa-admin'])->prefix('dashboard')->group(function(){
-        Route::get('users', [UserController::class, 'index'])->name('dashboard.user.index');
-        Route::get('users/create', [UserController::class, 'create'])->name('dashboard.user.create');
-        Route::post('users/store', [UserController::class, 'store'])->name('dashboard.user.store');
-        Route::get('users/{id}', [UserController::class, 'show'])->name('dashboard.user.show');
-        Route::get('users/{id}/edit', [UserController::class, 'edit'])->name('dashboard.user.edit');
-        Route::put('users/{id}', [UserController::class, 'update'])->name('dashboard.user.update');
-        Route::delete('users/{id}', [UserController::class, 'destroy'])->name('dashboard.user.destroy');
-        Route::patch('users/{id}/toggle-status', [UserController::class, 'toggleStatus'])->name('dashboard.user.toggle-status');
-        Route::get('users/advanced-search', [UserController::class, 'advancedSearch'])->name('dashboard.user.advanced-search');
-        Route::get('users/search', [UserController::class, 'search'])->name('dashboard.user.search');
-   Route::post('user/preview-id', [UserController::class, 'previewId'])->name('dashboard.user.preview-id');
-        });
-    
-    // ==================== Student Management ====================
-    Route::middleware(['role:super_admin,soft_admin,madrasa_admin'])->prefix('dashboard')->group(function(){
-        Route::get('students', [StudentController::class, 'index'])->name('dashboard.students.index');
-        Route::get('students/create', [StudentController::class, 'create'])->name('dashboard.students.create');
-        Route::post('students/store', [StudentController::class, 'store'])->name('dashboard.students.store');
-        Route::get('students/{id}', [StudentController::class, 'show'])->name('dashboard.students.show');
-        Route::get('students/{id}/edit', [StudentController::class, 'edit'])->name('dashboard.students.edit');
-        Route::put('students/{id}', [StudentController::class, 'update'])->name('dashboard.students.update');
-        Route::delete('students/{id}', [StudentController::class, 'destroy'])->name('dashboard.students.destroy');
-        Route::get('students/search', [StudentController::class, 'search'])->name('dashboard.students.search');
-    });
-    
-    // ==================== Admission Management ====================
-// ==================== Admission Management ====================
-Route::middleware(['role:super_admin,soft_admin,madrasa_admin'])
-    ->prefix('dashboard')
-    ->group(function(){
-
-    // SEARCH ROUTE FIRST
-    Route::get('admissions/search', [AdmissionController::class, 'search'])
-        ->name('dashboard.admissions.search');
-
-    Route::get('admissions/fee-structure/{classId}', [AdmissionController::class, 'getFeeStructure'])
-        ->name('dashboard.admissions.fee-structure');
-
-    Route::get('admissions', [AdmissionController::class, 'index'])
-        ->name('dashboard.admissions.index');
-
-    Route::get('admissions/create', [AdmissionController::class, 'create'])
-        ->name('dashboard.admissions.create');
-
-    Route::post('admissions/store', [AdmissionController::class, 'store'])
-        ->name('dashboard.admissions.store');
-
-    // {id} ROUTES BELOW
-    Route::get('admissions/{id}', [AdmissionController::class, 'show'])
-        ->name('dashboard.admissions.show');
-
-    Route::get('admissions/{id}/edit', [AdmissionController::class, 'edit'])
-        ->name('dashboard.admissions.edit');
-
-    Route::put('admissions/{id}', [AdmissionController::class, 'update'])
-        ->name('dashboard.admissions.update');
-
-    Route::delete('admissions/{id}', [AdmissionController::class, 'destroy'])
-        ->name('dashboard.admissions.destroy');
-
-    Route::patch('admissions/{id}/toggle-status', [AdmissionController::class, 'toggleStatus'])
-        ->name('dashboard.admissions.toggle-status');
-    
-});
-    Route::middleware(['role:super_admin,soft_admin,madrasa_admin'])->prefix('dashboard')->group(function(){
-    // 🏫 Institution Routes
-    Route::get('institutions', [InstitutionController::class, 'index'])->name('dashboard.institutions.index');
-    Route::post('institutions', [InstitutionController::class, 'store'])->name('dashboard.institutions.store');
-
-    // AJAX Edit Modal
-    Route::get('institutions/{id}/edit', [InstitutionController::class, 'edit'])->name('institutions.edit');
-    Route::put('institutions/{id}', [InstitutionController::class, 'update'])->name('institutions.update');
-
-    // Delete
-    Route::delete('institutions/{id}', [InstitutionController::class, 'destroy'])->name('dashboard.institutions.destroy');
-
-});
-    // ==================== Academic Year Management ====================
-    Route::middleware(['role:super_admin,soft_admin,madrasa_admin'])->prefix('dashboard')->group(function(){
-        Route::get('academic-years', [AcademicYearController::class, 'index'])->name('dashboard.academic-years.index');
-        Route::get('academic-years/create', [AcademicYearController::class, 'create'])->name('dashboard.academic-years.create');
-        Route::post('academic-years/store', [AcademicYearController::class, 'store'])->name('dashboard.academic-years.store');
-        Route::get('academic-years/{id}', [AcademicYearController::class, 'show'])->name('dashboard.academic-years.show');
-        Route::get('academic-years/{id}/edit', [AcademicYearController::class, 'edit'])->name('dashboard.academic-years.edit');
-        Route::put('academic-years/{id}', [AcademicYearController::class, 'update'])->name('dashboard.academic-years.update');
-        Route::delete('academic-years/{id}', [AcademicYearController::class, 'destroy'])->name('dashboard.academic-years.destroy');
-        Route::post('academic-years/{id}/toggle-status', [AcademicYearController::class, 'toggleStatus'])->name('dashboard.academic-years.toggle-status');
-        Route::post('academic-years/{id}/set-current', [AcademicYearController::class, 'setCurrent'])->name('dashboard.academic-years.set-current');
-        Route::post('academic-year/store-ajax', [AcademicYearController::class, 'storeAjax'])
-        ->name('dashboard.academic-year.store-ajax');
-        });
-    
-    // ==================== Class Management ====================
-    Route::middleware(['role:super_admin,soft_admin,madrasa_admin'])->prefix('dashboard')->group(function(){
-        Route::get('classes', [ClassController::class, 'index'])->name('dashboard.classes.index');
-        Route::get('classes/create', [ClassController::class, 'create'])->name('dashboard.classes.create');
-        Route::post('classes/store', [ClassController::class, 'store'])->name('dashboard.classes.store');
-        Route::get('classes/{id}', [ClassController::class, 'show'])->name('dashboard.classes.show');
-        Route::get('classes/{id}/edit', [ClassController::class, 'edit'])->name('dashboard.classes.edit');
-        Route::put('classes/{id}', [ClassController::class, 'update'])->name('dashboard.classes.update');
-        Route::delete('classes/{id}', [ClassController::class, 'destroy'])->name('dashboard.classes.destroy');
-        Route::post('classes/{id}/toggle-status', [ClassController::class, 'toggleStatus'])->name('dashboard.classes.toggle-status');
-        
-        // AJAX Routes for Class
-        Route::get('classes/{classId}/sections', [ClassController::class, 'getSections'])->name('dashboard.classes.sections');
-        Route::get('get-all-classes', [ClassController::class, 'getAllClasses'])->name('dashboard.classes.all');
-        Route::post('class/store-ajax', [ClassController::class, 'storeAjax'])->name('dashboard.class.store-ajax');
-        });
-    
-    // ==================== Section Management ====================
-    Route::middleware(['role:super_admin,soft_admin,madrasa_admin'])->prefix('dashboard')->group(function(){
-        Route::get('sections', [SectionController::class, 'index'])->name('dashboard.sections.index');
-        Route::get('sections/create', [SectionController::class, 'create'])->name('dashboard.sections.create');
-        Route::post('sections/store', [SectionController::class, 'store'])->name('dashboard.sections.store');
-        Route::get('sections/{id}', [SectionController::class, 'show'])->name('dashboard.sections.show');
-        Route::get('sections/{id}/edit', [SectionController::class, 'edit'])->name('dashboard.sections.edit');
-        Route::put('sections/{id}', [SectionController::class, 'update'])->name('dashboard.sections.update');
-        Route::delete('sections/{id}', [SectionController::class, 'destroy'])->name('dashboard.sections.destroy');
-        Route::post('sections/{id}/toggle-status', [SectionController::class, 'toggleStatus'])->name('dashboard.sections.toggle-status');
-        
-        // AJAX Routes for Section
-        Route::get('get-sections/{classId}', [SectionController::class, 'getSectionsByClass'])->name('dashboard.sections.by-class');
-        Route::post('sections/bulk-create', [SectionController::class, 'bulkCreate'])->name('dashboard.sections.bulk-create');
-        Route::get('section-stats', [SectionController::class, 'getSectionStats'])->name('dashboard.sections.stats');
-    });
-    
-    // ==================== Teacher View Routes ====================
-    Route::middleware(['role:teacher'])->prefix('dashboard')->group(function(){
-        Route::get('students', [StudentController::class, 'index'])->name('dashboard.students.index');
-        Route::get('students/{id}', [StudentController::class, 'show'])->name('dashboard.students.show');
-        Route::get('admissions', [AdmissionController::class, 'index'])->name('dashboard.admissions.index');
-        Route::get('admissions/{id}', [AdmissionController::class, 'show'])->name('dashboard.admissions.show');
-    });
-    
-    Route::middleware(['role:super_admin,soft_admin,madrasa_admin'])->prefix('dashboard')->group(function(){
-    Route::get('/transactions', [TransactionController::class, 'index'])->name('dashboard.transactions.index');
-    Route::post('/transactions/store', [TransactionController::class, 'store'])->name('dashboard.transactions.store');
-    Route::delete('/transactions/{id}', [TransactionController::class, 'destroy'])->name('dashboard.transactions.destroy');
-    Route::get('/reports/income-expense',[IncomeExpenseReportController::class, 'incomeExpense'])->name('dashboard.reports.income-expense');
-Route::get('/fee-report', [FeeReportController::class, 'index'])
-    ->name('dashboard.fee-report.index');
-     Route::get('fee-report', [FeeReportController::class, 'index'])->name('dashboard.fee-report.index');
-    Route::get('fee-report/print', [FeeReportController::class, 'print'])->name('dashboard.fee-report.print');
-    Route::get('fee-report/pdf', [FeeReportController::class, 'pdf'])->name('dashboard.fee-report.pdf');
-    Route::get('fee-report/excel', [FeeReportController::class, 'excel'])->name('dashboard.fee-report.excel');
-    Route::post('/ledger/store', [LedgerController::class, 'store'])->name('dashboard.ledger.store');
-    Route::post('/sub-ledger/store', [SubLedgerController::class, 'store'])->name('dashboard.sub-ledger.store');
-    Route::get('/sub-ledger/{id}', [SubLedgerController::class, 'getByLedger'])->name('dashboard.ledger.index');
-    Route::get('/fund-ledgers/{id}', [LedgerController::class, 'fundLedgers'])->name('dashboard.ledger.fundLedgers');
-
-    Route::post('/fund/store', [FundController::class, 'store'])->name('dashboard.fund.store');
-    Route::post('/payment-method/store', [PaymentMethodController::class, 'store'])->name('dashboard.payment-method.store');
-    Route::get('/payment-method/list', [PaymentMethodController::class, 'index'])->name('dashboard.payment-method.index');
-    Route::delete('/payment-method/{id}', [PaymentMethodController::class, 'destroy']);
-    Route::post('/cashier/store', [CashierController::class, 'store'])->name('dashboard.cashier.store');
-    Route::get('/cashier/list', [CashierController::class, 'index']);
-    Route::delete('/cashier/{id}', [CashierController::class, 'destroy']);
-    });
-
-    
-    // ==================== Student Profile Routes ====================
-    Route::middleware(['role:student'])->prefix('dashboard')->group(function(){
-        Route::get('my-profile', [StudentController::class, 'myProfile'])->name('dashboard.student.profile');
-        Route::get('my-admission', [StudentController::class, 'myAdmission'])->name('dashboard.student.admission');
-    });
-    
-    // ==================== Guardian Routes ====================
-    Route::middleware(['role:guardian'])->prefix('dashboard')->group(function(){
-        Route::get('my-children', [StudentController::class, 'myChildren'])->name('dashboard.guardian.children');
-        Route::get('my-children/{id}', [StudentController::class, 'show'])->name('dashboard.guardian.child.show');
-    });
-
-    // ── Month Settings Routes ──────────────────────────────────────────────────
-Route::middleware(['role:super_admin,soft_admin,madrasa_admin'])->prefix('dashboard/month')->group(function(){
-    Route::get('/', [MonthSettingController::class, 'index'])->name('dashboard.month.index');
-    Route::post('/', [MonthSettingController::class, 'store'])->name('dashboard.month.store');
-    Route::get('/suggest', [MonthSettingController::class, 'suggest'])->name('dashboard.month.suggest');
-    
-    Route::get('/{monthSetting}/edit', [MonthSettingController::class, 'edit'])->name('dashboard.month.edit');
-    Route::put('/{monthSetting}', [MonthSettingController::class, 'update'])->name('dashboard.month.update');
-    Route::delete('/{monthSetting}', [MonthSettingController::class, 'destroy'])->name('dashboard.month.destroy');
-});
-
-// ── Fee Settings Routes ──────────────────────────────────────────────────
-Route::prefix('dashboard/fee-settings')
-    ->name('dashboard.fee-settings.')
-    ->middleware(['role:super_admin,soft_admin,madrasa_admin'])
+// ============ Dashboard Routes (Auth Required) ============
+Route::prefix('dashboard')
+    ->name('dashboard.')
+    ->middleware(['auth', 'institution'])
     ->group(function () {
 
-        Route::get('/', [FeeSettingController::class, 'index'])
+        // ─── Dashboard ──────────────────────────────────────────────
+        Route::get('/', [AdminDashboardController::class, 'index'])
+            ->middleware('permission:dashboard.view')
             ->name('index');
 
-        Route::get('/get', [FeeSettingController::class, 'get'])
-            ->name('get');
-
-        Route::post('/save', [FeeSettingController::class, 'save'])
-            ->name('save');
-
-        Route::post('/reset', [FeeSettingController::class, 'reset'])
-            ->name('reset');
-    });
-
-Route::middleware(['role:super_admin,soft_admin,madrasa_admin'])->prefix('dashboard')->group(function(){
-    Route::get('/fees', [FeeGroupController::class, 'index'])->name('dashboard.fees.index');
-    Route::get('/fees/create', [FeeGroupController::class, 'create'])->name('dashboard.fees.create');
-    Route::post('/fees/store', [FeeGroupController::class, 'store'])->name('dashboard.fees.store');
-    Route::get('/fees/{fee}/edit', [FeeGroupController::class, 'edit'])->name('dashboard.fees.edit');
-    Route::put('/fees/{fee}/update', [FeeGroupController::class, 'update'])->name('dashboard.fees.update');
-    Route::delete('/fees/{fee}/delete', [FeeGroupController::class, 'destroy'])->name('dashboard.fees.destroy');
-
-    // AJAX ROUTES
-    Route::get('/fees/get-ledgers/{fund_id}', [FeeGroupController::class, 'getLedgers'])->name('dashboard.fees.getLedgers');
-    Route::get('/fees/get-sub-ledgers/{ledger_id}', [FeeGroupController::class, 'getSubLedgers'])->name('dashboard.fees.getSubLedgers');
-    Route::get('/fees/get-student-fees', [FeeGroupController::class, 'getStudentFees'])->name('dashboard.fees.getStudentFees');
-    Route::post('/fees/update-status', [FeeGroupController::class, 'updateStatus'])->name('dashboard.fees.updateStatus');
-
-});
-
-Route::prefix('dashboard/fee-type')
-    ->name('dashboard.fee-type.')
-    ->middleware(['role:super_admin,soft_admin,madrasa_admin'])
-    ->group(function () {
-        Route::get('/', [FeeTypeController::class, 'index'])->name('index');
-        Route::post('/store', [FeeTypeController::class, 'store'])->name('store');
-        Route::get('/edit/{id}', [FeeTypeController::class, 'edit'])->name('edit');
-        Route::put('/update/{id}', [FeeTypeController::class, 'update'])->name('update');
-        Route::delete('/destroy/{id}', [FeeTypeController::class, 'destroy'])->name('destroy');
-        Route::post('/toggle-status/{id}', [FeeTypeController::class, 'toggleStatus'])->name('toggle-status');
-
+        // ─── Profile Routes (All Authenticated Users) ──────────────
+        Route::prefix('profile')->group(function () {
+            Route::get('/', [ProfileController::class, 'adminProfile'])->name('profile');
+            Route::post('/', [ProfileController::class, 'adminProfileUpdate'])->name('profile.update');
+            Route::get('account', [ProfileController::class, 'adminAccount'])->name('account');
+            Route::post('account/password', [ProfileController::class, 'adminPasswordUpdate'])->name('account.password');
         });
 
-Route::middleware(['role:super_admin,soft_admin,madrasa_admin'])->prefix('dashboard')->group(function(){
-    
-    // Fee Collection Routes
-    Route::get('/fee-collections', [FeeCollectionController::class, 'index'])->name('dashboard.feeCollections.index');
-    Route::get('/fee-collections/create', [FeeCollectionController::class, 'create'])->name('dashboard.feeCollections.create');
-    Route::post('/fee-collections', [FeeCollectionController::class, 'store'])->name('dashboard.feeCollections.store');
-    Route::get('/fee-collections/{id}', [FeeCollectionController::class, 'show'])->name('dashboard.feeCollections.show');
-    Route::delete('/fee-collections/{id}', [FeeCollectionController::class, 'destroy'])->name('dashboard.feeCollections.destroy');
-    
-});
+        // ─── Notification Routes ─────────────────────────────────────
+        Route::prefix('notifications')->group(function () {
+            Route::get('poll', [NotificationController::class, 'poll'])->name('notifications.poll');
+            Route::post('mark-all-read', [NotificationController::class, 'markAllRead'])->name('notifications.markAllRead');
+            Route::post('clear-all', [NotificationController::class, 'clearAll'])->name('notifications.clearAll');
+        });
 
-Route::middleware(['role:super_admin,soft_admin,madrasa_admin'])
-    ->prefix('dashboard')
-    ->name('dashboard.fee-collection.')
+        // ─── Settings ────────────────────────────────────────────────
+        Route::get('settings', [SettingController::class, 'index'])
+            ->middleware('permission:general.view')
+            ->name('settings.index');
+
+        // ================================================================
+        // 1. USER MANAGEMENT
+        // ================================================================
+        Route::prefix('users')
+            ->middleware('permission:user.view')
+            ->group(function () {
+                Route::get('/', [UserController::class, 'index'])->name('user.index');
+                Route::get('create', [UserController::class, 'create'])->middleware('permission:user.create')->name('user.create');
+                Route::post('store', [UserController::class, 'store'])->middleware('permission:user.create')->name('user.store');
+                Route::get('search', [UserController::class, 'search'])->name('user.search');
+                Route::get('advanced-search', [UserController::class, 'advancedSearch'])->name('user.advanced-search');
+                Route::post('preview-id', [UserController::class, 'previewId'])->middleware('permission:user.create')->name('user.preview-id');
+                
+                // User ID specific routes
+                Route::prefix('{id}')->group(function () {
+                    Route::get('/', [UserController::class, 'show'])->name('user.show');
+                    Route::get('edit', [UserController::class, 'edit'])->middleware('permission:user.edit')->name('user.edit');
+                    Route::put('/', [UserController::class, 'update'])->middleware('permission:user.edit')->name('user.update');
+                    Route::delete('/', [UserController::class, 'destroy'])->middleware('permission:user.delete')->name('user.destroy');
+                    Route::patch('toggle-status', [UserController::class, 'toggleStatus'])->middleware('permission:user.edit')->name('user.toggle-status');
+                });
+            });
+
+        // ================================================================
+        // 2. STUDENT MANAGEMENT
+        // ================================================================
+        Route::prefix('students')
+            ->middleware('permission:student.view')
+            ->group(function () {
+                Route::get('/', [StudentController::class, 'index'])->name('students.index');
+                Route::get('search', [StudentController::class, 'search'])->name('students.search');
+                Route::get('create', [StudentController::class, 'create'])->middleware('permission:student.create')->name('students.create');
+                Route::post('store', [StudentController::class, 'store'])->middleware('permission:student.create')->name('students.store');
+                
+                Route::prefix('{id}')->group(function () {
+                    Route::get('/', [StudentController::class, 'show'])->name('students.show');
+                    Route::get('edit', [StudentController::class, 'edit'])->middleware('permission:student.edit')->name('students.edit');
+                    Route::put('/', [StudentController::class, 'update'])->middleware('permission:student.edit')->name('students.update');
+                    Route::delete('/', [StudentController::class, 'destroy'])->middleware('permission:student.delete')->name('students.destroy');
+                });
+            });
+
+        // ================================================================
+        // 3. ADMISSION MANAGEMENT
+        // ================================================================
+        Route::prefix('admissions')
+            ->middleware('permission:admission.view')
+            ->group(function () {
+                Route::get('/', [AdmissionController::class, 'index'])->name('admissions.index');
+                Route::get('search', [AdmissionController::class, 'search'])->name('admissions.search');
+                Route::get('fee-structure/{classId}', [AdmissionController::class, 'getFeeStructure'])->name('admissions.fee-structure');
+                
+                Route::get('create', [AdmissionController::class, 'create'])->middleware('permission:admission.create')->name('admissions.create');
+                Route::post('store', [AdmissionController::class, 'store'])->middleware('permission:admission.create')->name('admissions.store');
+                
+                Route::prefix('{id}')->group(function () {
+                    Route::get('/', [AdmissionController::class, 'show'])->name('admissions.show');
+                    Route::get('edit', [AdmissionController::class, 'edit'])->middleware('permission:admission.edit')->name('admissions.edit');
+                    Route::put('/', [AdmissionController::class, 'update'])->middleware('permission:admission.edit')->name('admissions.update');
+                    Route::delete('/', [AdmissionController::class, 'destroy'])->middleware('permission:admission.delete')->name('admissions.destroy');
+                    Route::patch('toggle-status', [AdmissionController::class, 'toggleStatus'])->middleware('permission:admission.edit')->name('admissions.toggle-status');
+                });
+            });
+
+        // ================================================================
+        // 4. CLASS MANAGEMENT
+        // ================================================================
+        Route::prefix('classes')
+            ->middleware('permission:class.view')
+            ->group(function () {
+                Route::get('/', [ClassController::class, 'index'])->name('classes.index');
+                Route::get('create', [ClassController::class, 'create'])->middleware('permission:class.create')->name('classes.create');
+                Route::post('store', [ClassController::class, 'store'])->middleware('permission:class.create')->name('classes.store');
+                Route::post('store-ajax', [ClassController::class, 'storeAjax'])->middleware('permission:class.create')->name('class.store-ajax');
+                Route::get('all', [ClassController::class, 'getAllClasses'])->name('classes.all');
+                
+                Route::prefix('{id}')->group(function () {
+                    Route::get('/', [ClassController::class, 'show'])->name('classes.show');
+                    Route::get('edit', [ClassController::class, 'edit'])->middleware('permission:class.edit')->name('classes.edit');
+                    Route::put('/', [ClassController::class, 'update'])->middleware('permission:class.edit')->name('classes.update');
+                    Route::delete('/', [ClassController::class, 'destroy'])->middleware('permission:class.delete')->name('classes.destroy');
+                    Route::post('toggle-status', [ClassController::class, 'toggleStatus'])->middleware('permission:class.edit')->name('classes.toggle-status');
+                    Route::get('sections', [ClassController::class, 'getSections'])->name('classes.sections');
+                });
+            });
+
+        // ================================================================
+        // 5. SECTION MANAGEMENT
+        // ================================================================
+        Route::prefix('sections')
+            ->middleware('permission:section.view')
+            ->group(function () {
+                Route::get('/', [SectionController::class, 'index'])->name('sections.index');
+                Route::get('create', [SectionController::class, 'create'])->middleware('permission:section.create')->name('sections.create');
+                Route::post('store', [SectionController::class, 'store'])->middleware('permission:section.create')->name('sections.store');
+                Route::post('bulk-create', [SectionController::class, 'bulkCreate'])->middleware('permission:section.create')->name('sections.bulk-create');
+                Route::get('stats', [SectionController::class, 'getSectionStats'])->name('sections.stats');
+                Route::get('by-class/{classId}', [SectionController::class, 'getSectionsByClass'])->name('sections.by-class');
+                
+                Route::prefix('{id}')->group(function () {
+                    Route::get('/', [SectionController::class, 'show'])->name('sections.show');
+                    Route::get('edit', [SectionController::class, 'edit'])->middleware('permission:section.edit')->name('sections.edit');
+                    Route::put('/', [SectionController::class, 'update'])->middleware('permission:section.edit')->name('sections.update');
+                    Route::delete('/', [SectionController::class, 'destroy'])->middleware('permission:section.delete')->name('sections.destroy');
+                    Route::post('toggle-status', [SectionController::class, 'toggleStatus'])->middleware('permission:section.edit')->name('sections.toggle-status');
+                });
+            });
+
+        // ================================================================
+        // 6. ACADEMIC YEAR MANAGEMENT
+        // ================================================================
+        Route::prefix('academic-years')
+            ->middleware('permission:academic.view')
+            ->group(function () {
+                Route::get('/', [AcademicYearController::class, 'index'])->name('academic-years.index');
+                Route::get('create', [AcademicYearController::class, 'create'])->middleware('permission:academic.create')->name('academic-years.create');
+                Route::post('store', [AcademicYearController::class, 'store'])->middleware('permission:academic.create')->name('academic-years.store');
+                Route::post('store-ajax', [AcademicYearController::class, 'storeAjax'])->middleware('permission:academic.create')->name('academic-year.store-ajax');
+                
+                Route::prefix('{id}')->group(function () {
+                    Route::get('/', [AcademicYearController::class, 'show'])->name('academic-years.show');
+                    Route::get('edit', [AcademicYearController::class, 'edit'])->middleware('permission:academic.edit')->name('academic-years.edit');
+                    Route::put('/', [AcademicYearController::class, 'update'])->middleware('permission:academic.edit')->name('academic-years.update');
+                    Route::delete('/', [AcademicYearController::class, 'destroy'])->middleware('permission:academic.delete')->name('academic-years.destroy');
+                    Route::post('toggle-status', [AcademicYearController::class, 'toggleStatus'])->middleware('permission:academic.edit')->name('academic-years.toggle-status');
+                    Route::post('set-current', [AcademicYearController::class, 'setCurrent'])->middleware('permission:academic.edit')->name('academic-years.set-current');
+                });
+            });
+
+        // ================================================================
+        // 7. INSTITUTION MANAGEMENT
+        // ================================================================
+        Route::prefix('institutions')
+            ->middleware('permission:institution.view')
+            ->group(function () {
+                Route::get('/', [InstitutionController::class, 'index'])->name('institutions.index');
+                Route::post('/', [InstitutionController::class, 'store'])->middleware('permission:institution.create')->name('institutions.store');
+                
+                Route::prefix('{id}')->group(function () {
+                    Route::get('edit', [InstitutionController::class, 'edit'])->middleware('permission:institution.edit')->name('institutions.edit');
+                    Route::put('/', [InstitutionController::class, 'update'])->middleware('permission:institution.edit')->name('institutions.update');
+                    Route::delete('/', [InstitutionController::class, 'destroy'])->middleware('permission:institution.delete')->name('institutions.destroy');
+                });
+            });
+
+        // ================================================================
+        // 8. MONTH SETTINGS
+        // ================================================================
+        Route::prefix('month')
+            ->middleware('permission:month.view')
+            ->group(function () {
+                Route::get('/', [MonthSettingController::class, 'index'])->name('month.index');
+                Route::post('/', [MonthSettingController::class, 'store'])->middleware('permission:month.create')->name('month.store');
+                Route::get('suggest', [MonthSettingController::class, 'suggest'])->name('month.suggest');
+                
+                Route::prefix('{monthSetting}')->group(function () {
+                    Route::get('edit', [MonthSettingController::class, 'edit'])->middleware('permission:month.edit')->name('month.edit');
+                    Route::put('/', [MonthSettingController::class, 'update'])->middleware('permission:month.edit')->name('month.update');
+                    Route::delete('/', [MonthSettingController::class, 'destroy'])->middleware('permission:month.delete')->name('month.destroy');
+                });
+            });
+
+        // ================================================================
+        // 9. FEE TYPE MANAGEMENT
+        // ================================================================
+        Route::prefix('fee-type')
+            ->middleware('permission:fee-type.view')
+            ->group(function () {
+                Route::get('/', [FeeTypeController::class, 'index'])->name('fee-type.index');
+                Route::post('store', [FeeTypeController::class, 'store'])->middleware('permission:fee-type.create')->name('fee-type.store');
+                Route::get('edit/{id}', [FeeTypeController::class, 'edit'])->middleware('permission:fee-type.edit')->name('fee-type.edit');
+                Route::put('update/{id}', [FeeTypeController::class, 'update'])->middleware('permission:fee-type.edit')->name('fee-type.update');
+                Route::delete('destroy/{id}', [FeeTypeController::class, 'destroy'])->middleware('permission:fee-type.delete')->name('fee-type.destroy');
+                Route::post('toggle-status/{id}', [FeeTypeController::class, 'toggleStatus'])->middleware('permission:fee-type.edit')->name('fee-type.toggle-status');
+            });
+
+        // ================================================================
+        // 10. FEE SETTINGS
+        // ================================================================
+        Route::prefix('fee-settings')
+            ->middleware('permission:fee.view')
+            ->group(function () {
+                Route::get('/', [FeeSettingController::class, 'index'])->name('fee-settings.index');
+                Route::get('get', [FeeSettingController::class, 'get'])->name('fee-settings.get');
+                Route::post('save', [FeeSettingController::class, 'save'])->middleware('permission:fee.create')->name('fee-settings.save');
+                Route::post('reset', [FeeSettingController::class, 'reset'])->middleware('permission:fee.delete')->name('fee-settings.reset');
+            });
+
+        // ================================================================
+        // 11. FEE GROUP / FEES
+        // ================================================================
+        Route::prefix('fees')
+            ->middleware('permission:fee.view')
+            ->group(function () {
+                Route::get('/', [FeeGroupController::class, 'index'])->name('fees.index');
+                Route::get('create', [FeeGroupController::class, 'create'])->middleware('permission:fee.create')->name('fees.create');
+                Route::post('store', [FeeGroupController::class, 'store'])->middleware('permission:fee.create')->name('fees.store');
+                
+                // AJAX Routes
+                Route::get('get-ledgers/{fund_id}', [FeeGroupController::class, 'getLedgers'])->name('fees.getLedgers');
+                Route::get('get-sub-ledgers/{ledger_id}', [FeeGroupController::class, 'getSubLedgers'])->name('fees.getSubLedgers');
+                Route::get('get-student-fees', [FeeGroupController::class, 'getStudentFees'])->name('fees.getStudentFees');
+                Route::post('update-status', [FeeGroupController::class, 'updateStatus'])->middleware('permission:fee.edit')->name('fees.updateStatus');
+                
+                Route::prefix('{fee}')->group(function () {
+                    Route::get('edit', [FeeGroupController::class, 'edit'])->middleware('permission:fee.edit')->name('fees.edit');
+                    Route::put('update', [FeeGroupController::class, 'update'])->middleware('permission:fee.edit')->name('fees.update');
+                    Route::delete('delete', [FeeGroupController::class, 'destroy'])->middleware('permission:fee.delete')->name('fees.destroy');
+                });
+            });
+
+        // ================================================================
+        // 12. FEE COLLECTION
+        // ================================================================
+        Route::prefix('fee-collection')
+            ->middleware('permission:fee.view')
+            ->group(function () {
+                Route::get('/', [StudentFeeCollectionController::class, 'index'])->name('fee-collection.index');
+                Route::get('student-info', [StudentFeeCollectionController::class, 'studentInfo'])->name('fee-collection.studentInfo');
+                Route::get('payment-methods', [StudentFeeCollectionController::class, 'paymentMethods'])->name('fee-collection.paymentMethods');
+                Route::post('save-payment', [StudentFeeCollectionController::class, 'savePayment'])->middleware('permission:fee.collect')->name('fee-collection.savePayment');
+                Route::get('today-payments', [StudentFeeCollectionController::class, 'todayPayments'])->name('fee-collection.todayPayments');
+                Route::get('statement', [StudentFeeCollectionController::class, 'statement'])->name('fee-collection.statement');
+                Route::post('add-cashier', [StudentFeeCollectionController::class, 'addCashier'])->middleware('permission:fee.collect')->name('fee-collection.addCashier');
+                Route::get('print-receipt/{id}', [StudentFeeCollectionController::class, 'printReceipt'])->middleware('permission:invoice.print')->name('fee-collection.printReceipt');
+            });
+
+        // ================================================================
+        // 13. ACCOUNTING / TRANSACTIONS
+        // ================================================================
+        Route::prefix('accounting')
+            ->middleware('permission:income.view')
+            ->group(function () {
+                // Transactions
+                Route::prefix('transactions')->group(function () {
+                    Route::get('/', [TransactionController::class, 'index'])->name('transactions.index');
+                    Route::post('store', [TransactionController::class, 'store'])->middleware('permission:income.create')->name('transactions.store');
+                    Route::delete('{id}', [TransactionController::class, 'destroy'])->middleware('permission:income.delete')->name('transactions.destroy');
+                });
+
+                // Income & Expense Report
+                Route::get('reports/income-expense', [IncomeExpenseReportController::class, 'incomeExpense'])
+                    ->middleware('permission:accounting-report.view')
+                    ->name('reports.income-expense');
+
+                // Fee Report
+                Route::prefix('fee-report')
+                    ->middleware('permission:fee.report')
+                    ->group(function () {
+                        Route::get('/', [FeeReportController::class, 'index'])->name('fee-report.index');
+                        Route::get('print', [FeeReportController::class, 'print'])->name('fee-report.print');
+                        Route::get('pdf', [FeeReportController::class, 'pdf'])->name('fee-report.pdf');
+                        Route::get('excel', [FeeReportController::class, 'excel'])->name('fee-report.excel');
+                    });
+
+                // Ledger
+                Route::prefix('ledger')->group(function () {
+                    Route::get('/', [LedgerController::class, 'index'])->name('ledger.index');
+                    Route::post('store', [LedgerController::class, 'store'])->middleware('permission:income.create')->name('ledger.store');
+                    Route::get('fund-ledgers/{id}', [LedgerController::class, 'fundLedgers'])->name('ledger.fundLedgers');
+                });
+
+                // Sub Ledger
+                Route::prefix('sub-ledger')->group(function () {
+                    Route::post('store', [SubLedgerController::class, 'store'])->middleware('permission:income.create')->name('sub-ledger.store');
+                    Route::get('{id}', [SubLedgerController::class, 'getByLedger'])->name('sub-ledger.getByLedger');
+                });
+
+                // Fund
+                Route::post('fund/store', [FundController::class, 'store'])
+                    ->middleware('permission:income.create')
+                    ->name('fund.store');
+
+                // Payment Method
+                Route::prefix('payment-method')->group(function () {
+                    Route::get('list', [PaymentMethodController::class, 'index'])->name('payment-method.index');
+                    Route::post('store', [PaymentMethodController::class, 'store'])->middleware('permission:payment.create')->name('payment-method.store');
+                    Route::delete('{id}', [PaymentMethodController::class, 'destroy'])->middleware('permission:payment.delete')->name('payment-method.destroy');
+                });
+
+                // Cashier
+                Route::prefix('cashier')->group(function () {
+                    Route::get('list', [CashierController::class, 'index'])->name('cashier.index');
+                    Route::post('store', [CashierController::class, 'store'])->middleware('permission:payment.create')->name('cashier.store');
+                    Route::delete('{id}', [CashierController::class, 'destroy'])->middleware('permission:payment.delete')->name('cashier.destroy');
+                });
+            });
+
+        // ================================================================
+        // 14. SYSTEM MANAGEMENT
+        // ================================================================
+Route::prefix('system')
+    ->middleware([
+        'permission:system-panel.view',
+        'role:super-admin'
+    ])
     ->group(function () {
-        Route::get('/fee-collection',[StudentFeeCollectionController::class, 'index'])->name('index');
-        Route::get('/fee-collection/student-info',[StudentFeeCollectionController::class, 'studentInfo'])->name('studentInfo');
-        Route::get('/fee-collection/payment-methods',[StudentFeeCollectionController::class, 'paymentMethods'])->name('paymentMethods');
-        Route::post('/fee-collection/save-payment',[StudentFeeCollectionController::class, 'savePayment'])->name('savePayment');
-        Route::get('/fee-collection/today-payments',[StudentFeeCollectionController::class, 'todayPayments'])->name('todayPayments');
-        Route::get('/fee-collection/statement',[StudentFeeCollectionController::class, 'statement'])->name('statement');
-        Route::post('/fee-collection/add-cashier',[StudentFeeCollectionController::class, 'addCashier'])->name('addCashier');
-        Route::get('/fee-collection/print-receipt/{id}',[StudentFeeCollectionController::class, 'printReceipt'])->name('printReceipt');
+
+        // System Panels
+        Route::resource('panels', SystemPanelController::class)
+            ->except(['show'])
+            ->names([
+                'index' => 'system-panels.index',
+                'create' => 'system-panels.create',
+                'store' => 'system-panels.store',
+                'edit' => 'system-panels.edit',
+                'update' => 'system-panels.update',
+                'destroy' => 'system-panels.destroy',
+            ]);
+
+        // Panel Manager
+        Route::get('panel-manager', [SystemPanelManagerController::class, 'index'])
+            ->name('system-panel-manager.index');
+
+        Route::post('panel-manager/update', [SystemPanelManagerController::class, 'update'])
+            ->name('system-panel-manager.update');
+
+        // Permissions
+        Route::resource('permissions', PermissionController::class)
+            ->except(['show', 'create'])
+            ->names([
+                'index' => 'permissions.index',
+                'edit' => 'permissions.edit',
+                'update' => 'permissions.update',
+                'destroy' => 'permissions.destroy',
+            ]);
+
+        // Role Permission
+        Route::get('role-permissions', [RolePermissionController::class, 'index'])
+            ->name('role-permissions.index');
+
+        Route::post('role-permissions', [RolePermissionController::class, 'update'])
+            ->name('role-permissions.update');
+
     });
 
-Route::middleware(['role:super_admin,soft_admin,madrasa_admin'])
-    ->prefix('dashboard')
-    ->name('dashboard.fee-collection.')
-    ->group(function () {
+        // ================================================================
+        // 15. STUDENT PROFILE (Student Role)
+        // ================================================================
+        Route::prefix('student')
+            ->middleware('role:student')
+            ->group(function () {
+                Route::get('my-profile', [StudentController::class, 'myProfile'])->name('student.profile');
+                Route::get('my-admission', [StudentController::class, 'myAdmission'])->name('student.admission');
+            });
 
-        Route::get('/fee-collection', [StudentFeeCollectionController::class, 'index'])->name('index');
-        Route::get('/fee-collection/student-info', [StudentFeeCollectionController::class, 'studentInfo'])->name('studentInfo');
-        Route::post('/fee-collection/save-payment', [StudentFeeCollectionController::class, 'savePayment'])->name('savePayment');
-        Route::get('/fee-collection/today-payments', [StudentFeeCollectionController::class, 'todayPayments'])->name('todayPayments');
-        Route::get('/fee-collection/statement', [StudentFeeCollectionController::class, 'statement'])->name('statement');
-        Route::post('/fee-collection/add-cashier', [StudentFeeCollectionController::class, 'addCashier'])->name('addCashier');
-        Route::get('/fee-collection/payment-methods', [StudentFeeCollectionController::class, 'paymentMethods'])->name('paymentMethods');
-        Route::get('/fee-collection/print-receipt/{id}', [StudentFeeCollectionController::class, 'printReceipt'])->name('printReceipt');
+        // ================================================================
+        // 16. GUARDIAN (Guardian Role)
+        // ================================================================
+        Route::prefix('guardian')
+            ->middleware('role:guardian')
+            ->group(function () {
+                Route::get('my-children', [StudentController::class, 'myChildren'])->name('guardian.children');
+                Route::get('my-children/{id}', [StudentController::class, 'show'])->name('guardian.child.show');
+            });
+
+        // ================================================================
+        // 17. TEACHER ROUTES (Teacher Role - Limited Access)
+        // ================================================================
+        Route::prefix('teacher')
+            ->middleware('role:teacher')
+            ->group(function () {
+                Route::get('students', [StudentController::class, 'index'])->name('teacher.students.index');
+                Route::get('students/{id}', [StudentController::class, 'show'])->name('teacher.students.show');
+                Route::get('admissions', [AdmissionController::class, 'index'])->name('teacher.admissions.index');
+                Route::get('admissions/{id}', [AdmissionController::class, 'show'])->name('teacher.admissions.show');
+            });
     });
-
-});
 
 require __DIR__.'/auth.php';

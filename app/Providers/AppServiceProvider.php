@@ -18,13 +18,32 @@ class AppServiceProvider extends ServiceProvider
     /**
      * Bootstrap any application services.
      */
-public function boot(): void
-{
-    Blade::if('permission', function ($permission) {
+    public function boot(): void
+    {
+        /*
+        |--------------------------------------------------------------------------
+        | Permission Directive
+        |--------------------------------------------------------------------------
+        */
 
-        return auth()->check()
-            && auth()->user()->hasPermission($permission);
+        Blade::if('permission', function ($permission) {
 
-    });
-}
+            return auth()->check()
+                && auth()->user()->hasPermission($permission);
+
+        });
+
+        /*
+        |--------------------------------------------------------------------------
+        | Panel Directive
+        |--------------------------------------------------------------------------
+        */
+
+        Blade::if('panel', function ($panel) {
+
+            return auth()->check()
+                && auth()->user()->hasPanel($panel);
+
+        });
+    }
 }

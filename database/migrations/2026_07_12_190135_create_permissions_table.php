@@ -8,30 +8,25 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::create('permissions', function (Blueprint $table) {
+       Schema::create('permissions', function (Blueprint $table) {
 
-            $table->id();
+    $table->id();
+    $table->string('module',100)->nullable();
+    $table->string('permission_name',150);
 
-            $table->string('module',100);
-            // Student, Teacher, User, Fee, Reports
+    $table->string('slug',150)->unique();
 
-            $table->string('permission_name',150);
-            // View Student
+    $table->text('description')->nullable();
 
-            $table->string('slug',150)->unique();
-            // student.view
+    $table->unsignedInteger('serial')->default(0);
 
-            $table->text('description')->nullable();
+    $table->boolean('is_system')->default(true);
 
-            $table->boolean('is_system')->default(true);
+    $table->boolean('is_active')->default(true);
 
-            $table->boolean('status')->default(true);
+    $table->timestamps();
 
-            $table->timestamps();
-
-            $table->index('module');
-            $table->index('slug');
-        });
+});
     }
 
     public function down(): void

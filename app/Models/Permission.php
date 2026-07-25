@@ -10,48 +10,51 @@ class Permission extends Model
     use HasFactory;
 
     protected $fillable = [
-        'module',
-        'permission_name',
-        'slug',
-        'description',
-        'is_system',
-        'status',
-    ];
 
-    protected $casts = [
-        'is_system' => 'boolean',
-        'status'    => 'boolean',
-    ];
+    'system_panel_id',
+    'permission_name',
+    'slug',
+    'description',
+    'serial',
+    'is_system',
+    'is_active',
+
+];
+
+protected $casts = [
+
+    'is_system' => 'boolean',
+    'is_active' => 'boolean',
+
+];
 
     /*
     |--------------------------------------------------------------------------
     | Roles
     |--------------------------------------------------------------------------
     */
+public function systemPanel()
+{
+    return $this->belongsTo(SystemPanel::class);
+}
 
-    public function roles()
-    {
-        return $this->belongsToMany(
-            Role::class,
-            'role_permissions'
-        )->withTimestamps();
-    }
+public function roles()
+{
+    return $this->belongsToMany(
+        Role::class,
+        'role_permissions'
+    )->withTimestamps();
+}
 
-    /*
-    |--------------------------------------------------------------------------
-    | Users
-    |--------------------------------------------------------------------------
-    */
-
-    public function users()
-    {
-        return $this->belongsToMany(
-            User::class,
-            'user_permissions'
-        )
-        ->withPivot('allow')
-        ->withTimestamps();
-    }
+public function users()
+{
+    return $this->belongsToMany(
+        User::class,
+        'user_permissions'
+    )
+    ->withPivot('allow')
+    ->withTimestamps();
+}
 
     /*
     |--------------------------------------------------------------------------
@@ -59,8 +62,17 @@ class Permission extends Model
     |--------------------------------------------------------------------------
     */
 
-    public function scopeActive($query)
-    {
-        return $query->where('status', true);
-    }
+public function scopeActive($query)
+{
+    return $query->where('is_active',1);
+}
+
+public function scopeOrdered($query)
+{
+    return $query->orderBy('serial');
+}
+    public function panel()
+{
+    return $this->belongsTo(SystemPanel::class, 'system_panel_id');
+}
 }

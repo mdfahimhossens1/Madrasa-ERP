@@ -78,11 +78,11 @@ session([
     'institution_id' => $user->institution_id,
 ]);
 
-return redirect()->route('dashboard');
+return redirect()->route('dashboard.index');
 }
 private function redirectBasedOnRole($user): RedirectResponse
 {
-    return redirect()->route('dashboard');
+    return redirect()->route('dashboard.index');
 }
 
     public function destroy(Request $request): RedirectResponse
